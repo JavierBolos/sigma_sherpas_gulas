@@ -224,3 +224,5 @@ def ask_during_video(req: VideoQuestionRequest):
         return {"answer": answer, "audio_b64": audio_b64}
     except Exception as e:
         return {"answer": f"Error: {str(e)}", "audio_b64": ""}
+
+#hola
