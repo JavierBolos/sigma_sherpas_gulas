@@ -16,6 +16,15 @@
         { name: "Timothy", role: "adult" },
         { name: "Melanie", role: "adult" }
       ],
+<<<<<<< HEAD
+=======
+      contextMembers: ["Timothy", "Melanie", "Liam", "Josh"],
+      mainGoals: [
+        "Proteger a la familia y revisar la cobertura ante imprevistos.",
+        "Planificar el ahorro para la educación de sus hijos.",
+        "Priorizar las deudas con intereses altos y organizar el ahorro disponible."
+      ],
+>>>>>>> origin/branch1
       defaultPriorities: ["education", "retirement"]
     },
     "michael-carter": {
@@ -23,6 +32,15 @@
       members: [
         { name: "Michael", role: "adult" }
       ],
+<<<<<<< HEAD
+=======
+      contextMembers: ["Michael"],
+      mainGoals: [
+        "Preparar la jubilación y sostener sus planes a largo plazo.",
+        "Organizar la compra de vivienda y mantener una reserva para imprevistos.",
+        "Revisar la protección financiera y el flujo de efectivo."
+      ],
+>>>>>>> origin/branch1
       defaultPriorities: ["housing", "retirement"]
     },
     "daniel-emily-johnson": {
@@ -31,6 +49,15 @@
         { name: "Daniel", role: "adult" },
         { name: "Emily", role: "adult" }
       ],
+<<<<<<< HEAD
+=======
+      contextMembers: ["Daniel", "Emily", "Oliver", "Sophia"],
+      mainGoals: [
+        "Fortalecer el plan de jubilación y el ahorro familiar.",
+        "Proteger a la familia ante imprevistos y crear una reserva de efectivo.",
+        "Planificar la educación de sus hijos y reducir las deudas más costosas."
+      ],
+>>>>>>> origin/branch1
       defaultPriorities: ["debt", "education"]
     },
     "samantha-lewis": {
@@ -38,11 +65,21 @@
       members: [
         { name: "Samantha", role: "adult" }
       ],
+<<<<<<< HEAD
+=======
+      contextMembers: ["Samantha", "Ethan", "Ava"],
+      mainGoals: [
+        "Reforzar el plan de jubilación y mejorar el flujo de efectivo.",
+        "Preparar el ahorro para la educación de sus hijos.",
+        "Revisar la protección de la familia y sus planes de vivienda."
+      ],
+>>>>>>> origin/branch1
       defaultPriorities: ["education", "housing"]
     }
   };
 
   const PRIORITY_OPTIONS = [
+<<<<<<< HEAD
     { id: "education", label: "Educación de los hijos" },
     { id: "retirement", label: "Jubilación y futuro" },
     { id: "housing", label: "Vivienda" },
@@ -50,6 +87,43 @@
     { id: "debt", label: "Reducir deudas" },
     { id: "investments", label: "Ahorro e inversión" },
     { id: "other", label: "Otros objetivos" }
+=======
+    {
+      id: "education",
+      label: "Educación de los hijos",
+      help: "Ahorro para estudios y formación, ahora o en el futuro."
+    },
+    {
+      id: "retirement",
+      label: "Jubilación y futuro",
+      help: "Planificación del ahorro y los ingresos para cuando dejéis de trabajar."
+    },
+    {
+      id: "housing",
+      label: "Vivienda",
+      help: "Objetivos relacionados con comprar, alquilar o mantener una vivienda."
+    },
+    {
+      id: "security",
+      label: "Seguridad y protección",
+      help: "Protección ante imprevistos que puedan afectar a la familia o sus ingresos."
+    },
+    {
+      id: "debt",
+      label: "Reducir deudas",
+      help: "Organizar el pago de préstamos y priorizar los que tienen intereses más altos."
+    },
+    {
+      id: "investments",
+      label: "Ahorro e inversión",
+      help: "Ahorrar e invertir con un nivel de riesgo acorde a vuestros objetivos."
+    },
+    {
+      id: "other",
+      label: "Otros objetivos",
+      help: "Cualquier otro tema financiero que sea importante para la familia."
+    }
+>>>>>>> origin/branch1
   ];
 
   const ROLE_OPTIONS = [
@@ -65,6 +139,18 @@
     return node;
   }
 
+<<<<<<< HEAD
+=======
+  function appendTooltip(parent, term, description) {
+    const tooltip = el("span", "sq-tooltip", "i");
+    tooltip.setAttribute("tabindex", "0");
+    tooltip.setAttribute("aria-label", "Información sobre " + term + ": " + description);
+    tooltip.setAttribute("title", description);
+    tooltip.setAttribute("data-tooltip", description);
+    parent.appendChild(tooltip);
+  }
+
+>>>>>>> origin/branch1
   function sanitizeMemberId(rawName, index, usedIds) {
     let base = String(rawName || "")
       .normalize("NFD")
@@ -144,6 +230,33 @@
     );
     card.appendChild(header);
 
+<<<<<<< HEAD
+=======
+    const caseContext = el("div", "sq-case-context");
+    caseContext.setAttribute("aria-label", "Contexto de " + preset.label);
+    caseContext.appendChild(el("strong", "sq-context-label", "Miembros de la familia"));
+    caseContext.appendChild(el("p", "sq-context-members", preset.contextMembers.join(", ")));
+    caseContext.appendChild(el("strong", "sq-context-label", "Objetivos principales"));
+    const goalsList = el("ul", "sq-context-goals");
+    preset.mainGoals.forEach((goal) => {
+      goalsList.appendChild(el("li", "", goal));
+    });
+    caseContext.appendChild(goalsList);
+    card.appendChild(caseContext);
+
+    const progressSection = el("div", "sq-progress-section");
+    const progressLabel = el("span", "sq-progress-label", "Progreso del cuestionario");
+    const progress = el("progress", "sq-progress");
+    progress.max = 3;
+    progress.value = 0;
+    progress.setAttribute("aria-label", "Secciones obligatorias completadas");
+    const progressText = el("span", "sq-progress-text", "0 de 3 secciones completadas");
+    progressSection.appendChild(progressLabel);
+    progressSection.appendChild(progress);
+    progressSection.appendChild(progressText);
+    card.appendChild(progressSection);
+
+>>>>>>> origin/branch1
     const errorBox = el("div", "sq-error");
     errorBox.setAttribute("role", "alert");
     card.appendChild(errorBox);
@@ -158,6 +271,29 @@
       }
     }
 
+<<<<<<< HEAD
+=======
+    function updateProgress() {
+      let completedSections = 0;
+      const membersComplete =
+        state.members.length >= 1 &&
+        state.members.length <= 8 &&
+        state.members.every((member) => String(member.name || "").trim().length > 0);
+
+      if (membersComplete) completedSections += 1;
+      if (state.family_priorities.length >= 1 && state.family_priorities.length <= 3) {
+        completedSections += 1;
+      }
+      if (String(state.question || "").trim()) completedSections += 1;
+
+      progress.value = completedSections;
+      progressText.textContent = completedSections + " de 3 secciones completadas";
+      progress.setAttribute("aria-valuetext", progressText.textContent);
+    }
+
+    updateProgress();
+
+>>>>>>> origin/branch1
     // 1. Sección de miembros
     const membersSection = el("div", "sq-section");
     membersSection.appendChild(el("h4", "sq-section-title", "1. ¿Quién participa en la historia?"));
@@ -185,6 +321,10 @@
           removeBtn.addEventListener("click", () => {
             state.members.splice(idx, 1);
             renderMembers();
+<<<<<<< HEAD
+=======
+            updateProgress();
+>>>>>>> origin/branch1
           });
           top.appendChild(removeBtn);
         }
@@ -202,6 +342,10 @@
         nameInput.value = member.name;
         nameInput.addEventListener("input", (e) => {
           state.members[idx].name = e.target.value;
+<<<<<<< HEAD
+=======
+          updateProgress();
+>>>>>>> origin/branch1
         });
         nameField.appendChild(nameInput);
         grid.appendChild(nameField);
@@ -219,6 +363,10 @@
         roleSelect.addEventListener("change", (e) => {
           state.members[idx].role = e.target.value;
           renderMembers();
+<<<<<<< HEAD
+=======
+          updateProgress();
+>>>>>>> origin/branch1
         });
         roleField.appendChild(roleSelect);
         grid.appendChild(roleField);
@@ -315,6 +463,10 @@
         interests: ""
       });
       renderMembers();
+<<<<<<< HEAD
+=======
+      updateProgress();
+>>>>>>> origin/branch1
     });
 
     const addChildBtn = el("button", "sq-btn", "+ Añadir hijo/a (opcional)");
@@ -330,6 +482,10 @@
         interests: ""
       });
       renderMembers();
+<<<<<<< HEAD
+=======
+      updateProgress();
+>>>>>>> origin/branch1
     });
 
     memberActions.appendChild(addAdultBtn);
@@ -372,7 +528,17 @@
             state.family_priorities.push(opt.id);
           }
           renderPriorities();
+<<<<<<< HEAD
         });
+=======
+          updateProgress();
+        });
+        if (opt.help) {
+          chip.setAttribute("title", opt.help);
+          chip.setAttribute("aria-label", opt.label + ". Información: " + opt.help);
+          chip.setAttribute("data-tooltip", opt.help);
+        }
+>>>>>>> origin/branch1
         chipsContainer.appendChild(chip);
       });
 
@@ -423,7 +589,17 @@
 
     // Nivel financiero
     const litField = el("div", "sq-field");
+<<<<<<< HEAD
     litField.appendChild(el("label", "", "Nivel de detalle financiero"));
+=======
+    const litLabel = el("label", "", "Nivel de detalle financiero");
+    appendTooltip(
+      litLabel,
+      "nivel de detalle financiero",
+      "Indica cuántos términos y explicaciones financieras queréis incluir en la narración."
+    );
+    litField.appendChild(litLabel);
+>>>>>>> origin/branch1
     const litSelect = el("select", "sq-select");
     [
       { value: "beginner", label: "Sencillo y sin tecnicismos" },
@@ -472,6 +648,10 @@
     qInput.value = state.question;
     qInput.addEventListener("input", (e) => {
       state.question = e.target.value;
+<<<<<<< HEAD
+=======
+      updateProgress();
+>>>>>>> origin/branch1
     });
     qField.appendChild(qInput);
     styleSection.appendChild(qField);
@@ -482,6 +662,18 @@
     const submitBtn = el("button", "sq-btn-primary", "Generar nuestra historia personalizada");
     submitBtn.type = "button";
 
+<<<<<<< HEAD
+=======
+    const submitStatus = el("div", "sq-submit-status");
+    submitStatus.hidden = true;
+    submitStatus.setAttribute("role", "status");
+    submitStatus.setAttribute("aria-live", "polite");
+    const spinner = el("span", "sq-spinner");
+    spinner.setAttribute("aria-hidden", "true");
+    submitStatus.appendChild(spinner);
+    submitStatus.appendChild(el("span", "", "Enviando el cuestionario y preparando vuestra historia..."));
+
+>>>>>>> origin/branch1
     submitBtn.addEventListener("click", async () => {
       showError("");
 
@@ -536,17 +728,33 @@
       };
 
       submitBtn.disabled = true;
+<<<<<<< HEAD
       submitBtn.textContent = "Preparando historia...";
+=======
+      submitBtn.setAttribute("aria-busy", "true");
+      submitBtn.textContent = "Preparando historia...";
+      submitStatus.hidden = false;
+>>>>>>> origin/branch1
       try {
         await onSubmit(payload);
       } catch (err) {
         showError("Error al enviar el cuestionario: " + (err && err.message ? err.message : String(err)));
       } finally {
         submitBtn.disabled = false;
+<<<<<<< HEAD
         submitBtn.textContent = "Generar nuestra historia personalizada";
       }
     });
 
+=======
+        submitBtn.removeAttribute("aria-busy");
+        submitBtn.textContent = "Generar nuestra historia personalizada";
+        submitStatus.hidden = true;
+      }
+    });
+
+    card.appendChild(submitStatus);
+>>>>>>> origin/branch1
     card.appendChild(submitBtn);
     container.appendChild(card);
   }
