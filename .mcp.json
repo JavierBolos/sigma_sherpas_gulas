@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "sherpas-cases": {
+      "type": "http",
+      "url": "https://mcp-hackathon.sherpaswealth.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${MCP_TOKEN}"
+      },
+      "tools": ["*"]
+    }
+  }
+}
+
