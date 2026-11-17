@@ -2,370 +2,289 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Sherpas — Copiloto Financiero Interactivo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sherpas Wealth — Historias Financieras Interactivas</title>
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; background: #f1f5f9; color: #0f172a; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem; }
-    select, input, button { padding: 0.65rem 0.9rem; font-size: 0.95rem; border-radius: 8px; border: 1px solid #cbd5e1; }
-    button { background: #2563eb; color: white; border: none; cursor: pointer; font-weight: 600; }
-    button:hover { background: #1d4ed8; }
-    button:disabled { background: #94a3b8; cursor: not-allowed; }
-    .btn-video { background: #7c3aed; }
-    .btn-video:hover { background: #6d28d9; }
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg-slate: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+    }
 
-    /* Reproductor de Vídeo Interactivo */
-    #video-box { display: none; background: #0f172a; color: white; border-radius: 14px; padding: 1.5rem; margin-bottom: 1.2rem; box-shadow: 0 10px 25px rgba(0,0,0,0.18); }
-    .scene-bars { display: flex; gap: 6px; margin-bottom: 1rem; }
-    .scene-bar { flex: 1; height: 6px; background: #334155; border-radius: 4px; cursor: pointer; }
-    .scene-bar.active { background: #a855f7; }
-    .scene-bar.done { background: #22c55e; }
-    .stage { background: #1e293b; border-radius: 10px; padding: 1.4rem; min-height: 200px; display: flex; flex-direction: column; justify-content: space-between; }
-    .metric-pill { display: inline-block; background: rgba(168,85,247,0.2); border: 1px solid #a855f7; color: #e9d5ff; padding: 0.3rem 0.75rem; border-radius: 999px; font-size: 0.85rem; font-weight: 600; }
-    .metric-big { font-size: 2rem; font-weight: 800; color: #38bdf8; margin: 0.4rem 0; }
-    .comp-wrap { margin: 0.8rem 0; }
-    .comp-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: 0.85rem; }
-    .comp-track { flex: 1; background: #334155; height: 14px; border-radius: 7px; overflow: hidden; }
-    .comp-fill-before { height: 100%; background: #f43f5e; transition: width 0.8s ease; }
-    .comp-fill-after { height: 100%; background: #10b981; transition: width 0.8s ease; }
-    .subtitles { background: rgba(0,0,0,0.55); padding: 0.75rem 1rem; border-radius: 8px; margin-top: 0.9rem; font-size: 0.95rem; line-height: 1.4; color: #f8fafc; text-align: center; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* Caja de duda en tiempo real dentro del vídeo */
-    .live-qa { background: #1e293b; border: 1px solid #475569; border-radius: 10px; padding: 0.9rem; margin-top: 0.9rem; }
-    .live-qa-row { display: flex; gap: 0.5rem; }
-    .live-qa input { flex: 1; background: #0f172a; color: white; border: 1px solid #475569; }
-    .live-answer { display: none; background: rgba(56,189,248,0.12); border-left: 4px solid #38bdf8; padding: 0.8rem; border-radius: 6px; margin-top: 0.8rem; font-size: 0.92rem; line-height: 1.45; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg-slate);
+      color: var(--text-main);
+      line-height: 1.5;
+      padding: 1.5rem;
+    }
 
-    .video-controls { display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; flex-wrap: wrap; gap: 0.5rem; }
-    .video-controls button { background: #334155; font-size: 0.85rem; padding: 0.45rem 0.8rem; }
+    .container { max-width: 900px; margin: 0 auto; }
 
-    /* Chat */
-    #chat { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.2rem; height: 280px; overflow-y: auto; margin-bottom: 0.8rem; }
-    .msg { margin-bottom: 1rem; line-height: 1.55; }
-    .user { font-weight: 700; color: #1e40af; }
-    .bot { color: #1e293b; white-space: pre-wrap; }
-    .loading { color: #64748b; font-style: italic; }
-    .chips { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.8rem; }
-    .chip { background: #e2e8f0; color: #334155; font-size: 0.82rem; padding: 0.4rem 0.75rem; border-radius: 999px; border: none; cursor: pointer; }
-    .chip:hover { background: #cbd5e1; }
-    .row { display: flex; gap: 0.5rem; }
-    input { flex: 1; }
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card-bg);
+      padding: 1.25rem 1.5rem;
+      border-radius: 14px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .logo-area { display: flex; align-items: center; gap: 0.75rem; }
+
+    .logo-icon {
+      background: var(--primary);
+      color: white;
+      font-weight: 800;
+      font-size: 1.2rem;
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-title { font-size: 1.25rem; font-weight: 700; color: var(--text-main); }
+    .brand-subtitle { font-size: 0.8rem; color: var(--text-muted); }
+
+    .selector-group { display: flex; align-items: center; gap: 0.5rem; }
+
+    label { font-size: 0.9rem; font-weight: 600; color: var(--text-muted); }
+
+    select {
+      padding: 0.6rem 0.9rem;
+      font-size: 0.95rem;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background-color: #ffffff;
+      color: var(--text-main);
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-reset {
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+      padding: 0.5rem 0.9rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .btn-reset:hover { background: #e2e8f0; color: #1e293b; }
+
+    /* Indicador de Estado */
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .status-badge {
+      background: #dbeafe;
+      color: #1e3a8a;
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+    }
+
+    /* Estados de carga y error */
+    .loading-state {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 3rem 1.5rem;
+      text-align: center;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid var(--primary);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 1rem auto;
+    }
+
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .error-card {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      padding: 1.5rem;
+      border-radius: 12px;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 3rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h2 style="margin:0;">Copiloto Financiero Familiar</h2>
-    <div>
-      <label for="family"><strong>Familia:</strong> </label>
-      <select id="family" onchange="resetAll()">
-        <option value="timothy-melanie-weah">Timothy & Melanie Weah</option>
-        <option value="michael-carter">Michael Carter</option>
-        <option value="daniel-emily-johnson">Daniel & Emily Johnson</option>
-        <option value="samantha-lewis">Samantha Lewis</option>
-      </select>
-    </div>
-  </div>
 
-  <!-- REPRODUCTOR DE VÍDEO INTERACTIVO -->
-  <div id="video-box">
-    <div class="scene-bars" id="scene-bars"></div>
-    <div class="stage">
-      <div>
-        <span class="metric-pill" id="v-label">Escena 1</span>
-        <h3 id="v-title" style="margin: 0.5rem 0 0.2rem 0;">Título</h3>
-        <div class="metric-big" id="v-metric">$0</div>
-      </div>
-      <div class="comp-wrap">
-        <div class="comp-row">
-          <span style="width:65px;">Hoy</span>
-          <div class="comp-track"><div class="comp-fill-before" id="v-bar-before" style="width:0%"></div></div>
-          <span id="v-val-before">0</span>
-        </div>
-        <div class="comp-row">
-          <span style="width:65px;">Con plan</span>
-          <div class="comp-track"><div class="comp-fill-after" id="v-bar-after" style="width:0%"></div></div>
-          <span id="v-val-after">0</span>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="logo-area">
+        <div class="logo-icon">S</div>
+        <div>
+          <div class="brand-title">Sherpas Wealth</div>
+          <div class="brand-subtitle">Experiencia Financiera Interactiva</div>
         </div>
       </div>
-      <div style="font-size:0.88rem; color:#fde047;" id="v-tip"></div>
+      <div class="selector-group">
+        <label for="family-select">Familia:</label>
+        <select id="family-select" onchange="initFlow()">
+          <option value="timothy-melanie-weah">Timothy & Melanie Weah</option>
+          <option value="michael-carter">Michael Carter</option>
+          <option value="daniel-emily-johnson">Daniel & Emily Johnson</option>
+          <option value="samantha-lewis">Samantha Lewis</option>
+        </select>
+        <button class="btn-reset" onclick="initFlow()">🔄 Reiniciar</button>
+      </div>
+    </header>
+
+    <!-- Indicador de Estado -->
+    <div class="status-bar">
+      <span>Conectado a la API de Sherpas Wealth (Contrato v1)</span>
+      <span class="status-badge" id="data-status-badge">Estado Datos</span>
     </div>
 
-    <div class="subtitles" id="v-subs">Subtítulos...</div>
+    <!-- Contenedor Cuestionario (Frente A) -->
+    <div id="questionnaire-root"></div>
 
-    <!-- PREGUNTA EN TIEMPO REAL SOBRE LA ESCENA -->
-    <div class="live-qa">
-      <div style="font-size:0.82rem; color:#94a3b8; margin-bottom:0.4rem;">✋ ¿No entiendes algo de esta escena? Interrumpe el vídeo y pregunta:</div>
-      <div class="live-qa-row">
-        <input id="v-question" placeholder="Ej: ¿Por qué esa cantidad exacta?" onfocus="pauseVideo()" onkeydown="if(event.key==='Enter') askInVideo()" />
-        <button onclick="voiceAskInVideo()" style="background:#0284c7;" title="Preguntar hablando">🎤</button>
-        <button id="v-ask-btn" onclick="askInVideo()" style="background:#10b981;">Preguntar</button>
-      </div>
-      <div class="live-answer" id="v-answer-box">
-        <div id="v-answer-text"></div>
-        <button onclick="resumeAfterAnswer()" style="margin-top:0.6rem; background:#2563eb; font-size:0.82rem; padding:0.4rem 0.8rem;">▶ Entendido, seguir con el vídeo</button>
-      </div>
-    </div>
-
-    <div class="video-controls">
-      <div>
-        <button onclick="prevScene()">⏮ Anterior</button>
-        <button id="play-pause-btn" onclick="togglePause()">⏸ Pausar</button>
-        <button onclick="nextScene()">Siguiente ⏭</button>
-      </div>
-      <button onclick="closeVideo()" style="background:#ef4444;">✕ Cerrar vídeo</button>
-    </div>
+    <!-- Contenedor Reproductor (Frente C) -->
+    <div id="video-root"></div>
   </div>
 
-  <!-- PREGUNTAS RÁPIDAS -->
-  <div class="chips">
-    <button class="chip" onclick="quickAsk('¿Cuál es mi mayor problema financiero y qué hago primero?')">¿Cuál es mi mayor problema?</button>
-    <button class="chip" onclick="quickAsk('¿Cómo subo mi puntuación financiera paso a paso?')">¿Cómo subo mi nota?</button>
-    <button class="chip" onclick="quickAsk('¿Estoy protegiendo bien a mi familia y mi jubilación?')">Seguros y futuro</button>
-  </div>
+  <footer>
+    Sherpas × UPV Hackathon 2026 — Equipo <code>sigma_sherpas_gulas</code>
+  </footer>
 
-  <div id="chat"></div>
-
-  <div class="row">
-    <input id="input" placeholder="Escribe tu duda financiera aquí..." onkeydown="if(event.key==='Enter') sendChat()" />
-    <button id="btn-chat" onclick="sendChat()">Enviar</button>
-    <button id="btn-video" class="btn-video" onclick="startVideo()">🎬 Explicar en Vídeo</button>
-  </div>
+  <!-- Módulos JavaScript independientes -->
+  <script src="/static/questionnaire.js"></script>
+  <script src="/static/video.js"></script>
 
   <script>
-    let history = [];
-    let scenes = [];
-    let currentScene = 0;
-    let currentAudio = null;
-    let isPaused = false;
+    function initFlow() {
+      const caseId = document.getElementById("family-select").value;
+      const qRoot = document.getElementById("questionnaire-root");
+      const vRoot = document.getElementById("video-root");
 
-    function resetAll() {
-      history = [];
-      document.getElementById("chat").innerHTML = "";
-      closeVideo();
-    }
+      qRoot.style.display = "block";
+      qRoot.innerHTML = "";
+      vRoot.innerHTML = "";
 
-    function quickAsk(q) {
-      document.getElementById("input").value = q;
-      startVideo();
-    }
-
-    async function sendChat() {
-      const input = document.getElementById("input");
-      const chat = document.getElementById("chat");
-      const case_id = document.getElementById("family").value;
-      const text = input.value.trim();
-      if (!text) return;
-
-      chat.innerHTML += `<div class="msg user">Tú: ${text}</div>`;
-      const loadId = "l-" + Date.now();
-      chat.innerHTML += `<div id="${loadId}" class="msg loading">Analizando datos de la familia...</div>`;
-      chat.scrollTop = chat.scrollHeight;
-      input.value = "";
-      setButtonsDisabled(true);
-
-      try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ case_id, message: text, history })
-        });
-        const data = await res.json();
-        document.getElementById(loadId).remove();
-        chat.innerHTML += `<div class="msg bot">Asesor: ${data.reply}</div>`;
-        history.push({ role: "user", content: text }, { role: "assistant", content: data.reply });
-      } catch (e) {
-        document.getElementById(loadId).remove();
-        chat.innerHTML += `<div class="msg bot">⚠️ Error: ${e.message}</div>`;
-      } finally {
-        setButtonsDisabled(false);
-        chat.scrollTop = chat.scrollHeight;
+      if (typeof window.SherpasQuestionnaire === "undefined") {
+        qRoot.innerHTML = `
+          <div class="error-card">
+            <strong>⚠️ Módulo static/questionnaire.js no encontrado.</strong><br>
+            Asegúrate de haber creado el archivo <code>static/questionnaire.js</code>.
+          </div>`;
+        return;
       }
-    }
 
-    async function startVideo() {
-      const input = document.getElementById("input");
-      const chat = document.getElementById("chat");
-      const case_id = document.getElementById("family").value;
-      const text = input.value.trim() || "¿Cuál es mi mayor problema financiero y qué debería hacer primero?";
+      // 1. Montar Cuestionario (Frente A)
+      window.SherpasQuestionnaire.mount({
+        container: qRoot,
+        caseId: caseId,
+        onSubmit: async function (questionnaireRequestJson) {
+          qRoot.style.display = "none";
+          vRoot.innerHTML = `
+            <div class="loading-state">
+              <div class="spinner"></div>
+              <h3>Generando vuestra historia financiera personalizada...</h3>
+              <p style="color: #64748b; font-size: 0.9rem; margin-top: 0.5rem;">
+                Analizando el plan de Sherpas e integrando vuestras prioridades emocionales.
+              </p>
+            </div>`;
 
-      closeVideo();
-      const loadId = "lv-" + Date.now();
-      chat.innerHTML += `<div id="${loadId}" class="msg loading">🎬 Generando vídeo interactivo...</div>`;
-      chat.scrollTop = chat.scrollHeight;
-      setButtonsDisabled(true);
+          try {
+            // 2. Enviar datos al Backend (Frente B)
+            const response = await fetch("/api/story", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(questionnaireRequestJson)
+            });
 
-      try {
-        const res = await fetch("/api/video-explainer", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ case_id, message: text, history })
-        });
-        const data = await res.json();
-        document.getElementById(loadId).remove();
+            if (!response.ok) {
+              const errData = await response.json();
+              throw new Error(errData.detail || `Error HTTP ${response.status}`);
+            }
 
-        if (data.error || !data.scenes) {
-          chat.innerHTML += `<div class="msg bot">⚠️ No se pudo crear el vídeo: ${data.error || "Respuesta inválida"}</div>`;
-          return;
+            const storyResponseJson = await response.json();
+
+            // Actualizar badge con el origen de los datos (mcp / local_case)
+            const badge = document.getElementById("data-status-badge");
+            if (badge) badge.textContent = storyResponseJson.data_status || "OK";
+
+            vRoot.innerHTML = "";
+
+            if (typeof window.SherpasVideo === "undefined") {
+              vRoot.innerHTML = `
+                <div class="error-card">
+                  <strong>⚠️ Módulo static/video.js no encontrado.</strong><br>
+                  Falta el archivo <code>static/video.js</code> para renderizar la secuencia de escenas.
+                </div>`;
+              return;
+            }
+
+            // 3. Montar Reproductor de Vídeo (Frente C)
+            window.SherpasVideo.mount({
+              container: vRoot,
+              story: storyResponseJson,
+              onAsk: async function (videoQuestionRequestJson) {
+                const askRes = await fetch("/api/video-ask", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(videoQuestionRequestJson)
+                });
+                return await askRes.json();
+              }
+            });
+
+          } catch (err) {
+            vRoot.innerHTML = `
+              <div class="error-card">
+                <h3>⚠️ Error al conectar con el servidor</h3>
+                <p>${err.message}</p>
+                <button class="btn-reset" onclick="initFlow()" style="margin-top: 1rem;">Intentar de nuevo</button>
+              </div>`;
+          }
         }
-
-        scenes = data.scenes;
-        document.getElementById("video-box").style.display = "block";
-        playScene(0);
-      } catch (e) {
-        document.getElementById(loadId).remove();
-        chat.innerHTML += `<div class="msg bot">⚠️ Error de red: ${e.message}</div>`;
-      } finally {
-        setButtonsDisabled(false);
-      }
-    }
-
-    function playScene(idx) {
-      if (idx < 0 || idx >= scenes.length) return;
-      stopAudio();
-      document.getElementById("v-answer-box").style.display = "none";
-      currentScene = idx;
-      isPaused = false;
-      document.getElementById("play-pause-btn").textContent = "⏸ Pausar";
-
-      const s = scenes[idx];
-      const bars = document.getElementById("scene-bars");
-      bars.innerHTML = scenes.map((_, i) =>
-        `<div class="scene-bar ${i < idx ? 'done' : i === idx ? 'active' : ''}" onclick="playScene(${i})"></div>`
-      ).join("");
-
-      document.getElementById("v-label").textContent = `Escena ${idx + 1} de ${scenes.length} · ${s.metric_label}`;
-      document.getElementById("v-title").textContent = s.title;
-      document.getElementById("v-metric").textContent = s.metric_value;
-      document.getElementById("v-tip").textContent = "💡 " + s.action_tip;
-      document.getElementById("v-subs").textContent = s.narration;
-
-      setTimeout(() => {
-        document.getElementById("v-bar-before").style.width = Math.min(100, s.bar_before) + "%";
-        document.getElementById("v-bar-after").style.width = Math.min(100, s.bar_after) + "%";
-        document.getElementById("v-val-before").textContent = s.bar_before;
-        document.getElementById("v-val-after").textContent = s.bar_after;
-      }, 50);
-
-      speakText(s.narration, s.audio_b64, () => {
-        if (!isPaused && currentScene + 1 < scenes.length) playScene(currentScene + 1);
       });
     }
 
-    function speakText(text, audioB64, onEndCallback) {
-      stopAudio();
-      if (audioB64) {
-        currentAudio = new Audio("data:audio/mp3;base64," + audioB64);
-        if (onEndCallback) currentAudio.onended = onEndCallback;
-        currentAudio.play();
-      } else if ("speechSynthesis" in window) {
-        const utter = new SpeechSynthesisUtterance(text);
-        utter.lang = "es-ES";
-        if (onEndCallback) utter.onend = onEndCallback;
-        speechSynthesis.speak(utter);
-      }
-    }
-
-    function pauseVideo() {
-      isPaused = true;
-      if (currentAudio) currentAudio.pause();
-      if ("speechSynthesis" in window) speechSynthesis.pause();
-      document.getElementById("play-pause-btn").textContent = "▶ Reanudar";
-    }
-
-    function togglePause() {
-      if (!isPaused) {
-        pauseVideo();
-      } else {
-        isPaused = false;
-        if (currentAudio) currentAudio.play();
-        if ("speechSynthesis" in window) speechSynthesis.resume();
-        document.getElementById("play-pause-btn").textContent = "⏸ Pausar";
-      }
-    }
-
-    async function askInVideo() {
-      const qInput = document.getElementById("v-question");
-      const question = qInput.value.trim();
-      if (!question) return;
-
-      pauseVideo();
-      stopAudio();
-      const s = scenes[currentScene];
-      const case_id = document.getElementById("family").value;
-      const ansBox = document.getElementById("v-answer-box");
-      const ansText = document.getElementById("v-answer-text");
-
-      ansBox.style.display = "block";
-      ansText.textContent = "Pensando respuesta sobre esta escena...";
-      document.getElementById("v-ask-btn").disabled = true;
-
-      try {
-        const res = await fetch("/api/video-ask", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            case_id,
-            question,
-            scene_title: s.title,
-            scene_metric: s.metric_value,
-            scene_narration: s.narration
-          })
-        });
-        const data = await res.json();
-        qInput.value = "";
-        ansText.innerHTML = `<strong>Asesor:</strong> ${data.answer}`;
-        speakText(data.answer, data.audio_b64, null);
-      } catch (e) {
-        ansText.textContent = "⚠️ Error al responder: " + e.message;
-      } finally {
-        document.getElementById("v-ask-btn").disabled = false;
-      }
-    }
-
-    function voiceAskInVideo() {
-      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRec) {
-        alert("Tu navegador no soporta dictado por voz. Escribe tu duda en el cuadro.");
-        return;
-      }
-      pauseVideo();
-      stopAudio();
-      const rec = new SpeechRec();
-      rec.lang = "es-ES";
-      document.getElementById("v-question").placeholder = "🎙️ Escuchando tu pregunta...";
-      rec.onresult = (e) => {
-        document.getElementById("v-question").value = e.results[0][0].transcript;
-        document.getElementById("v-question").placeholder = "Ej: ¿Por qué esa cantidad exacta?";
-        askInVideo();
-      };
-      rec.start();
-    }
-
-    function resumeAfterAnswer() {
-      document.getElementById("v-answer-box").style.display = "none";
-      if (currentScene + 1 < scenes.length) {
-        playScene(currentScene + 1);
-      } else {
-        playScene(currentScene);
-      }
-    }
-
-    function prevScene() { if (currentScene > 0) playScene(currentScene - 1); }
-    function nextScene() { if (currentScene + 1 < scenes.length) playScene(currentScene + 1); }
-
-    function stopAudio() {
-      if (currentAudio) { currentAudio.pause(); currentAudio = null; }
-      if ("speechSynthesis" in window) speechSynthesis.cancel();
-    }
-
-    function closeVideo() {
-      stopAudio();
-      document.getElementById("video-box").style.display = "none";
-    }
-
-    function setButtonsDisabled(state) {
-      document.getElementById("btn-chat").disabled = state;
-      document.getElementById("btn-video").disabled = state;
-    }
+    document.addEventListener("DOMContentLoaded", initFlow);
   </script>
 </body>
 </html>
