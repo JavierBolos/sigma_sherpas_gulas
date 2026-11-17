@@ -1,0 +1,40 @@
+/* Estilos aislados: todos empiezan por sv- y no modifican el resto de la app */
+.sv-root { box-sizing:border-box; color:#f8fafc; font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif; display:flex; justify-content:center; padding:24px 8px; }
+.sv-root * { box-sizing:border-box; }
+.sv-device { width:min(100%,460px); min-height:680px; background:linear-gradient(155deg,#1b2451 0%,#0c1025 60%,#10162b 100%); border:1px solid rgba(255,255,255,.15); border-radius:26px; box-shadow:0 24px 64px rgba(5,9,25,.28); overflow:hidden; }
+.sv-header { padding:24px 24px 14px; background:radial-gradient(ellipse at 90% -10%,rgba(120,99,255,.32),transparent 64%); }
+.sv-eyebrow { color:#b5a6ff; font-size:11px; font-weight:800; letter-spacing:.18em; margin-bottom:7px; }
+.sv-story-title { margin:0; font-size:19px; letter-spacing:-.02em; }
+.sv-disclaimer { color:#cbd5e1; font-size:11px; line-height:1.55; margin:10px 0; }
+.sv-is-mock .sv-disclaimer::before { content:'DEMO · '; color:#fbbf24; font-weight:800; }
+.sv-step { font-size:10px; letter-spacing:.1em; color:#83e5d6; font-weight:700; margin:20px 0 9px; }
+.sv-timeline { display:flex; align-items:center; gap:5px; min-height:24px; overflow-x:auto; scrollbar-width:thin; padding-bottom:4px; }
+.sv-timeline-dot { white-space:nowrap; font-size:10px; color:#a3b0d5; background:#283254; border-radius:8px; padding:5px 8px; }
+.sv-timeline-dot.is-current { color:#0d1532; background:#85f3dd; font-weight:800; }
+.sv-stage { position:relative; min-height:345px; margin:0 15px; padding:21px 18px; border-radius:19px; background:linear-gradient(145deg,rgba(95,84,177,.3),rgba(14,28,58,.8)); border:1px solid rgba(255,255,255,.1); display:flex; flex-direction:column; align-items:flex-start; }
+.sv-year { font-size:12px; font-weight:800; color:#9fffe7; padding:5px 10px; background:#1e3f51; border-radius:999px; }
+.sv-symbol { font-size:60px; line-height:1.3; margin:13px auto 3px; filter:drop-shadow(0 9px 17px rgba(0,0,0,.28)); }
+.sv-scene-title { font-size:24px; line-height:1.13; margin:4px 0 10px; letter-spacing:-.04em; }
+.sv-metric { width:100%; border-radius:10px; background:rgba(21,202,172,.14); border:1px solid rgba(153,255,219,.4); padding:10px 12px; margin:0 0 12px; }
+.sv-metric-label { color:#baf5e9; font-size:12px; }
+.sv-metric-value { color:#fff; font-size:22px; font-weight:800; }
+.sv-narration { color:#e4e8f6; font-size:14px; line-height:1.6; margin:3px 0 10px; }
+.sv-source { font-size:10px; color:#b3bdd8; margin-top:auto; }
+.sv-choices { width:100%; display:grid; gap:9px; margin-top:auto; }
+.sv-choice { cursor:pointer; text-align:left; padding:13px 15px; font-size:14px; font-weight:750; border-radius:11px; color:#0e213b; background:#8af2dd; border:0; }
+.sv-choice:hover,.sv-choice:focus-visible { background:#b1ffec; outline:2px solid #fff; outline-offset:2px; }
+.sv-controls { margin:13px 16px 0; display:flex; gap:7px; }
+.sv-btn { cursor:pointer; border:0; border-radius:9px; padding:10px 12px; color:white; font-size:12px; font-weight:700; }
+.sv-btn:disabled { opacity:.42; cursor:not-allowed; }
+.sv-muted { background:#2c3553; flex:1; }
+.sv-primary { background:#7a67ee; flex:1.4; }
+.sv-qa { display:grid; grid-template-columns:1fr auto; gap:8px; padding:18px 16px 23px; }
+.sv-qa-label { grid-column:1/-1; font-size:12px; color:#c2c9e4; }
+.sv-qa-input { min-width:0; border:1px solid #465074; background:#17203a; color:white; padding:11px 12px; border-radius:9px; font-size:12px; }
+.sv-qa-input::placeholder { color:#9ba8cb; }
+.sv-ask { background:#33466d; }
+.sv-answer { margin-top:10px; width:100%; padding:12px; background:#24345e; border-left:3px solid #9effdc; border-radius:8px; }
+.sv-answer-text { margin:0 0 10px; font-size:13px; line-height:1.5; }
+.sv-answer-next { background:#644fe8; }
+@media(max-width:530px) { .sv-root { padding:0; } .sv-device { border-radius:15px; min-height:unset; } .sv-header { padding:20px 17px 13px; } .sv-stage { min-height:330px; } .sv-controls { flex-wrap:wrap; } }
+.sv-root [hidden] { display: none !important; }

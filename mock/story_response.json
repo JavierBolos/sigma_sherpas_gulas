@@ -1,0 +1,83 @@
+{
+  "schema_version": "1.0",
+  "case_id": "timothy-melanie-weah",
+  "title": "El futuro de Timothy y Melanie — DEMO",
+  "data_status": "mock",
+  "disclaimer": "DEMOSTRACIÓN: las preferencias son ficticias y esta historia no contiene proyecciones numéricas. El producto final se basará en el plan de Sherpas.",
+  "start_scene_id": "intro",
+  "scenes": [
+    {
+      "id": "intro",
+      "kind": "narration",
+      "year": null,
+      "period_label": "Hoy",
+      "title": "Una historia hecha para vosotros",
+      "narration": "Hola, Timothy y Melanie. Esta es una demostración de cómo una historia puede conectar vuestros objetivos personales con el plan financiero de Sherpas.",
+      "visual_type": "family",
+      "metric": null,
+      "source_refs": [],
+      "next_scene_id": "choose_topic",
+      "choices": [],
+      "audio_b64": ""
+    },
+    {
+      "id": "choose_topic",
+      "kind": "choice",
+      "year": null,
+      "period_label": "Elegís vosotros",
+      "title": "¿Qué queréis conocer primero?",
+      "narration": "Podéis elegir qué tema explorar. La elección cambia la historia que escucháis, no modifica las recomendaciones ni las cifras de Sherpas.",
+      "visual_type": "choice",
+      "metric": null,
+      "source_refs": [],
+      "next_scene_id": null,
+      "choices": [
+        {"id": "education", "label": "Educación de los hijos", "next_scene_id": "education_path"},
+        {"id": "retirement", "label": "Vuestra jubilación", "next_scene_id": "retirement_path"}
+      ],
+      "audio_b64": ""
+    },
+    {
+      "id": "education_path",
+      "kind": "narration",
+      "year": null,
+      "period_label": "Años futuros",
+      "title": "Pensando en la educación",
+      "narration": "Imaginad que exploramos la etapa en la que vuestros hijos empiezan a tomar decisiones sobre sus estudios. En la versión final, aquí aparecerán los hitos y las cifras que estén realmente documentados en vuestro plan.",
+      "visual_type": "goal",
+      "metric": null,
+      "source_refs": [],
+      "next_scene_id": "ending",
+      "choices": [],
+      "audio_b64": ""
+    },
+    {
+      "id": "retirement_path",
+      "kind": "narration",
+      "year": null,
+      "period_label": "Años futuros",
+      "title": "Imaginando la jubilación",
+      "narration": "Podemos mostrar cómo el plan describe el futuro de la jubilación, con sus supuestos y posibles límites. Esta escena de prueba no incluye cifras reales: se rellenará después de consultar las proyecciones de Sherpas.",
+      "visual_type": "timeline",
+      "metric": null,
+      "source_refs": [],
+      "next_scene_id": "ending",
+      "choices": [],
+      "audio_b64": ""
+    },
+    {
+      "id": "ending",
+      "kind": "ending",
+      "year": null,
+      "period_label": "Volvemos al presente",
+      "title": "El siguiente paso empieza hoy",
+      "narration": "Esta era una demostración de la experiencia interactiva. En la versión conectada al plan, esta pantalla resumirá las primeras acciones recomendadas de forma clara, sin inventar cifras ni consejos nuevos.",
+      "visual_type": "summary",
+      "metric": null,
+      "source_refs": [],
+      "next_scene_id": null,
+      "choices": [],
+      "audio_b64": ""
+    }
+  ]
+}

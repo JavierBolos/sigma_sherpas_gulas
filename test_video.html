@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sherpas — Prueba de mi parte 3</title>
+  <link rel="stylesheet" href="static/video.css">
+  <style>body{margin:0;background:#e7ecf4;font-family:system-ui,sans-serif;} .test-intro{text-align:center;padding:15px 12px 0;color:#1f2937} .test-intro h1{font-size:18px;margin:0 0 5px;} .test-intro p{font-size:13px;margin:0} </style>
+</head>
+<body>
+  <div class="test-intro"><h1>Prueba local · Parte 3</h1><p>Reproductor independiente del backend. Las historias son ficticias.</p></div>
+  <div id="video-container"></div>
+  <script src="static/video.js"></script>
+  <script>
+    fetch('mock/story_response.json')
+      .then(response => { if(!response.ok) throw new Error('No se encuentra mock/story_response.json'); return response.json(); })
+      .then(story => {
+        window.SherpasVideo.mount({
+          container: document.getElementById('video-container'),
+          story,
+          onAsk: async function(payload) {
+            // Simulación de /api/video-ask. El integrador reemplazará esta función con fetch.
+            return { answer: 'Respuesta de DEMOSTRACIÓN. Tu pregunta fue: ' + payload.question + '. La respuesta definitiva se obtendrá del backend de Sherpas.', audio_b64: '' };
+          }
+        });
+      })
+      .catch(err => { const p=document.createElement('p');p.textContent='Error: '+err.message+' · Abre la página desde un servidor local, no con file://';document.body.append(p); });
+  </script>
+</body>
+</html>
