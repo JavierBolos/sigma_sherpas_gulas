@@ -26,8 +26,6 @@
   color: #475569;
 }
 
-<<<<<<< HEAD
-=======
 .sq-case-context {
   margin-bottom: 1rem;
   padding: 0.85rem 1rem;
@@ -102,7 +100,6 @@
   transition: width 180ms ease;
 }
 
->>>>>>> origin/branch1
 .sq-section {
   margin-bottom: 1.25rem;
 }
@@ -155,8 +152,6 @@
   color: #334155;
 }
 
-<<<<<<< HEAD
-=======
 .sq-tooltip {
   position: relative;
   display: inline-flex;
@@ -211,7 +206,6 @@
   outline-offset: 2px;
 }
 
->>>>>>> origin/branch1
 .sq-input,
 .sq-select,
 .sq-textarea {
@@ -301,12 +295,9 @@
 }
 
 .sq-chip {
-<<<<<<< HEAD
-=======
   position: relative;
   display: inline-flex;
   align-items: center;
->>>>>>> origin/branch1
   padding: 0.38rem 0.72rem;
   border-radius: 999px;
   border: 1px solid #cbd5e1;
@@ -323,8 +314,6 @@
   color: #1e40af;
 }
 
-<<<<<<< HEAD
-=======
 .sq-chip::after {
   position: absolute;
   z-index: 5;
@@ -356,7 +345,6 @@
   visibility: visible;
 }
 
->>>>>>> origin/branch1
 .sq-ordered-list {
   display: flex;
   flex-direction: column;
@@ -399,9 +387,6 @@
   font-size: 0.85rem;
   margin-bottom: 0.85rem;
   display: none;
-<<<<<<< HEAD
-}
-=======
 }
 
 .sq-submit-status {
@@ -443,4 +428,3 @@
     animation: none;
   }
 }
->>>>>>> origin/branch1
