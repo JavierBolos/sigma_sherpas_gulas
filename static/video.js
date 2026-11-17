@@ -12,14 +12,18 @@
     if (text !== undefined) el.textContent = safeText(text);
     return el;
   };
+  const THEMES = new Set(['family_travel', 'dream_home', 'early_retirement', 'financial_shield']);
 
   function validateStory(story) {
-    if (!story || story.schema_version !== '1.0' || !Array.isArray(story.scenes)) {
+    if (!story || story.schema_version !== '1.0' || !Array.isArray(story.scenes) || story.scenes.length !== 4) {
       throw new Error('Se necesita una historia válida del contrato JSON v1.0.');
     }
     const sceneMap = new Map();
     for (const scene of story.scenes) {
       if (!scene.id || sceneMap.has(scene.id)) throw new Error('Hay escenas sin identificador o duplicadas.');
+      if (!THEMES.has(scene.visual_theme) || !scene.headline || !scene.narration || !scene.metric_badge) {
+        throw new Error('Cada escena debe incluir tema, titular, narración e indicador.');
+      }
       sceneMap.set(scene.id, scene);
     }
     if (!sceneMap.has(story.start_scene_id)) throw new Error('No existe la escena inicial.');
@@ -55,11 +59,17 @@
     const storyTitle = make('h2', 'sv-story-title', story.title);
     const disclaimer = make('p', 'sv-disclaimer', story.disclaimer);
     const step = make('div', 'sv-step', '');
-    const timeline = make('div', 'sv-timeline');
+    const progressTrack = make('div', 'sv-progress-track');
+    progressTrack.setAttribute('role', 'progressbar');
+    progressTrack.setAttribute('aria-label', 'Progreso de la historia');
+    progressTrack.setAttribute('aria-valuemin', '1');
+    progressTrack.setAttribute('aria-valuemax', String(story.scenes.length));
+    const progressFill = make('div', 'sv-progress-fill');
+    progressTrack.append(progressFill);
     const stage = make('main', 'sv-stage');
     const year = make('div', 'sv-year');
     const symbol = make('div', 'sv-symbol');
-    const title = make('h3', 'sv-scene-title');
+    const headline = make('h3', 'sv-scene-title');
     const metric = make('div', 'sv-metric');
     const metricLabel = make('div', 'sv-metric-label');
     const metricValue = make('div', 'sv-metric-value');
@@ -72,7 +82,7 @@
     const answerText = make('p', 'sv-answer-text');
     const continueAfterAsk = make('button', 'sv-btn sv-answer-next', '↻ Volver a escuchar esta escena');
     answerBox.append(answerText, continueAfterAsk);
-    stage.append(year, symbol, title, metric, narration, source, choices, answerBox);
+    stage.append(year, symbol, headline, metric, narration, source, choices, answerBox);
 
     const controls = make('div', 'sv-controls');
     const back = make('button', 'sv-btn sv-muted', '← Atrás');
@@ -93,12 +103,17 @@
     ask.type = 'submit';
     questions.append(questionLabel, questionInput, ask);
 
-    top.append(eyebrow, storyTitle, disclaimer, step, timeline);
+    top.append(eyebrow, storyTitle, disclaimer, step, progressTrack);
     device.append(top, stage, controls, questions);
     root.append(device);
     container.append(root);
 
-    const visuals = { family: '👨‍👩‍👧‍👦', timeline: '🗓️', chart: '📈', goal: '🎓', summary: '✨', choice: '🧭' };
+    const visuals = {
+      family_travel: '✈️',
+      dream_home: '🏡',
+      early_retirement: '🌅',
+      financial_shield: '🛡️'
+    };
 
     function stopSpeech() {
       playbackId += 1;
@@ -137,32 +152,34 @@
         window.speechSynthesis.speak(utterance);
       }
     }
-    function showTimeline(scene) {
-      timeline.replaceChildren();
-      const items = history.map((id) => sceneMap.get(id)).concat(scene);
-      for (const [i, item] of items.entries()) {
-        const label = item.year === null ? item.period_label : String(item.year);
-        const node = make('span', 'sv-timeline-dot' + (i === items.length - 1 ? ' is-current' : ''), label);
-        timeline.append(node);
-      }
-      step.textContent = scene.kind === 'choice' ? 'TÚ ELIGES EL RECORRIDO' : scene.kind === 'ending' ? 'EL SIGUIENTE PASO' : 'UN MOMENTO DE VUESTRA HISTORIA';
-    }
     function render() {
       const scene = sceneMap.get(currentId);
+      const sceneIndex = story.scenes.findIndex((item) => item.id === currentId);
+      const currentStep = sceneIndex + 1;
+      progressFill.style.width = `${(currentStep / story.scenes.length) * 100}%`;
+      progressTrack.setAttribute('aria-valuenow', String(currentStep));
+      progressTrack.setAttribute('aria-valuetext', `Escena ${currentStep} de ${story.scenes.length}`);
+      step.textContent = `ESCENA ${currentStep} DE ${story.scenes.length}`;
       answerBox.hidden = true;
       waitingAnswer = false;
       questionInput.value = '';
       year.textContent = scene.year === null ? safeText(scene.period_label) : String(scene.year);
-      symbol.textContent = visuals[scene.visual_type] || '✨';
-      title.textContent = safeText(scene.title);
+      symbol.textContent = visuals[scene.visual_theme];
+      headline.textContent = safeText(scene.headline);
+      stage.dataset.theme = scene.visual_theme;
       narration.textContent = safeText(scene.narration);
-      metric.hidden = !scene.metric;
-      if (scene.metric) {
-        metricLabel.textContent = safeText(scene.metric.label);
-        metricValue.textContent = safeText(scene.metric.value);
+      metric.hidden = !scene.metric_badge;
+      if (scene.metric_badge) {
+        metricLabel.textContent = safeText(scene.metric_badge.label);
+        metricValue.textContent = safeText(scene.metric_badge.value);
       }
-      source.textContent = scene.metric && scene.metric.source_ref ? 'Fuente: ' + safeText(scene.metric.source_ref) : '';
+      source.textContent = scene.metric_badge && scene.metric_badge.source_ref
+        ? 'Fuente: ' + safeText(scene.metric_badge.source_ref)
+        : '';
       source.hidden = !source.textContent;
+      stage.classList.remove('sv-scene-enter');
+      void stage.offsetWidth;
+      stage.classList.add('sv-scene-enter');
       choices.replaceChildren();
       if (scene.kind === 'choice') {
         for (const choice of (scene.choices || [])) {
@@ -179,7 +196,6 @@
       questions.hidden = !askHandler;
       if (story.data_status === 'mock') root.classList.add('sv-is-mock');
       else root.classList.remove('sv-is-mock');
-      showTimeline(scene);
       speak(scene);
     }
     function goTo(id, remember) {
@@ -237,8 +253,8 @@
         const result = await askHandler({
           case_id: story.case_id,
           question: text,
-          scene_title: scene.title,
-          scene_metric: scene.metric ? scene.metric.value : '',
+          scene_title: scene.headline,
+          scene_metric: scene.metric_badge ? scene.metric_badge.value : '',
           scene_narration: scene.narration
         });
         if (destroyed || currentId !== askedSceneId) return;
