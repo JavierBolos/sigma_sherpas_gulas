@@ -1,117 +1,404 @@
-# story_generator.py
+import re
+
+
+PRIORITY_LABELS = {
+    "education": "educación",
+    "retirement": "jubilación",
+    "housing": "vivienda",
+    "security": "seguridad financiera",
+    "debt": "reducir deudas",
+    "investments": "inversiones",
+    "other": "otros objetivos",
+}
+
+PRIORITY_THEMES = {
+    "education": "family_travel",
+    "retirement": "early_retirement",
+    "housing": "dream_home",
+    "security": "financial_shield",
+    "debt": "financial_shield",
+    "investments": "early_retirement",
+    "other": "family_travel",
+}
+
+PRIORITY_GOAL_TYPES = {
+    "education": {"COLLEGE", "EDUCATION"},
+    "retirement": {"RETIREMENT"},
+    "housing": {"PURCHASE"},
+    "debt": {"DEBT"},
+    "investments": {"INVESTMENT"},
+}
+
+MOVE_LABELS = {
+    "pay down revolving card": "reducir el saldo de la tarjeta",
+    "add life cover": "ampliar la cobertura de vida",
+    "raise mortality coverage": "ampliar la cobertura de vida",
+    "add umbrella cover": "añadir cobertura de responsabilidad civil",
+    "lower the withdrawal rate": "reducir el ritmo de retiros",
+    "raise growth allocation toward glide": "ajustar la proporción de inversiones de crecimiento",
+    "reduce growth allocation toward glide": "ajustar la proporción de inversiones de crecimiento",
+    "raise annual savings": "aumentar el ahorro anual",
+    "close a coverage gap": "cerrar una brecha de cobertura",
+    "reduce single-name concentration": "reducir la concentración de una inversión",
+}
+
+
+def _format_money(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    formatted = f"{value:,.2f}".rstrip("0").rstrip(".")
+    return f"${formatted}"
+
+
+def _year_from_text(value):
+    match = re.search(r"\b(20\d{2})\b", str(value or ""))
+    return int(match.group(1)) if match else None
+
+
+def _join_names(members, case_raw):
+    names = [
+        str(member.get("name", "")).strip()
+        for member in members
+        if isinstance(member, dict) and str(member.get("name", "")).strip()
+    ]
+    if not names:
+        financial = case_raw.get("financial_health_json", {})
+        household = financial.get("case", {}).get("household", [])
+        names = [
+            str(member.get("first_name", "")).strip()
+            for member in household
+            if isinstance(member, dict) and str(member.get("first_name", "")).strip()
+        ]
+    if not names:
+        return "Vuestra familia"
+    if len(names) == 1:
+        return names[0]
+    return ", ".join(names[:-1]) + " y " + names[-1]
+
+
+def _personal_detail(members):
+    labels = (
+        ("aspirations", "aspiración"),
+        ("concerns", "preocupación"),
+        ("interests", "interés"),
+        ("non_negotiables", "prioridad importante"),
+    )
+    for member in members:
+        if not isinstance(member, dict):
+            continue
+        for field, label in labels:
+            values = member.get(field, [])
+            if isinstance(values, str):
+                values = [values]
+            if values:
+                value = str(values[0]).strip()
+                if value:
+                    name = str(member.get("name", ""))
+                    subject = f"{name} nos comentó" if name else "Nos comentasteis"
+                    return f"{subject} como {label}: «{value[:160]}»."
+    return ""
+
+
+def _priority_theme(priority):
+    return PRIORITY_THEMES.get(priority, "family_travel")
+
+
+def _goal_for_priorities(goals, priorities):
+    for priority in priorities:
+        goal_types = PRIORITY_GOAL_TYPES.get(priority, set())
+        for goal in goals:
+            if not isinstance(goal, dict):
+                continue
+            goal_type = str(goal.get("goalType", "")).upper()
+            if goal_type in goal_types:
+                if priority != "housing" or goal.get("subType") == "REAL_ESTATE_PURCHASE":
+                    return goal, priority
+    for goal in goals:
+        if isinstance(goal, dict) and (
+            _format_money(goal.get("amount")) or _year_from_text(goal.get("value"))
+        ):
+            goal_type = str(goal.get("goalType", "")).upper()
+            subtype = str(goal.get("subType", "")).upper()
+            if goal_type == "RETIREMENT":
+                return goal, "retirement"
+            if goal_type == "COLLEGE":
+                return goal, "education"
+            if goal_type == "PURCHASE" and subtype == "REAL_ESTATE_PURCHASE":
+                return goal, "housing"
+            return goal, priorities[0] if priorities else "other"
+    return (goals[0], priorities[0] if priorities else "other") if goals else (None, "other")
+
+
+def _describe_goal(goal, priority):
+    if not isinstance(goal, dict):
+        return (
+            "El plan no incluye una meta específica para esta prioridad; "
+            "la historia mantiene el foco en los datos financieros disponibles.",
+            "Prioridad del cuestionario",
+            PRIORITY_LABELS.get(priority, "otros objetivos"),
+        )
+
+    goal_type = str(goal.get("goalType", "")).upper()
+    subtype = str(goal.get("subType", "")).upper()
+    amount = _format_money(goal.get("amount"))
+    year = _year_from_text(goal.get("value"))
+    if goal_type == "RETIREMENT":
+        metric_value = str(year) if year else amount
+        if year:
+            narration = f"El plan sitúa el objetivo de jubilación en {year}."
+        elif amount:
+            narration = f"El plan registra una meta de jubilación de {amount}."
+        else:
+            narration = "La jubilación figura entre las metas recogidas en vuestro plan."
+        return narration, "Año objetivo de jubilación" if year else "Meta de jubilación", metric_value or "Incluida en el plan"
+
+    if goal_type == "COLLEGE":
+        narration = (
+            f"El plan contempla {amount} para la educación de la familia."
+            if amount
+            else "El plan contempla una meta educativa para la familia."
+        )
+        if "each child" in str(goal.get("value", "")).lower():
+            narration = f"El plan contempla {amount} para la educación de cada hijo."
+        return narration, "Meta de educación", amount or "Incluida en el plan"
+
+    if goal_type == "PURCHASE" and subtype == "REAL_ESTATE_PURCHASE":
+        timing = f" para {year}" if year else ""
+        amount_text = amount or "una cantidad no especificada"
+        narration = f"El plan registra una meta de vivienda de {amount_text}{timing}."
+        return narration, "Meta de vivienda", amount or (str(year) if year else "Incluida en el plan")
+
+    if goal_type == "VACATION":
+        narration = (
+            f"El plan contempla una meta de viaje de {amount}."
+            if amount
+            else "El plan contempla una meta de viaje."
+        )
+        return narration, "Meta de viaje", amount or "Incluida en el plan"
+
+    if goal_type == "PURCHASE":
+        timing = f" para {year}" if year else ""
+        narration = f"El plan registra una meta de compra de {amount}{timing}."
+        return narration, "Meta de compra", amount or (str(year) if year else "Incluida en el plan")
+
+    if amount:
+        return (
+            f"El plan registra una meta de {amount} relacionada con {PRIORITY_LABELS.get(priority, 'vuestros objetivos')}.",
+            "Meta del plan",
+            amount,
+        )
+    return (
+        "Esta meta figura en el plan financiero de la familia.",
+        "Meta del plan",
+        str(year) if year else "Incluida en el plan",
+    )
+
+
+def _projection_for_goal(financial, goal):
+    projections = financial.get("projections", {}).get("yearly", [])
+    if not projections:
+        return None
+    goal_year = _year_from_text(goal.get("value")) if isinstance(goal, dict) else None
+    if goal_year:
+        for projection in projections:
+            if projection.get("year") == goal_year:
+                return projection
+    return projections[0]
+
+
+def _describe_move_action(move):
+    title = str(move.get("title", "")).strip().lower()
+    action = str(move.get("action", ""))
+    amount_match = re.search(r"\$[\d,]+(?:\.\d+)?(?:M)?", action)
+    amount = amount_match.group(0) if amount_match else None
+
+    if title == "pay down revolving card" and amount:
+        rate = re.search(r"\d+(?:\.\d+)?%", action)
+        rate_text = f" al {rate.group(0)}" if rate else ""
+        return f"El plan propone destinar {amount} desde el efectivo a la tarjeta{rate_text}."
+    if title in {"add life cover", "raise mortality coverage"} and amount:
+        return f"El plan recomienda ampliar la cobertura de vida en {amount}."
+    if title == "add umbrella cover" and amount:
+        return f"El plan recomienda añadir {amount} de cobertura de responsabilidad civil."
+    if title == "lower the withdrawal rate" and amount:
+        rate = re.search(r"\d+(?:\.\d+)?%", action)
+        rate_text = f" ({rate.group(0)})" if rate else ""
+        return f"El plan propone limitar los retiros a {amount} al año{rate_text}."
+    if title == "raise annual savings" and amount:
+        return f"El plan propone redirigir {amount} al año al ahorro."
+    if title in {"raise growth allocation toward glide", "reduce growth allocation toward glide"} and amount:
+        return f"El plan recomienda ajustar la cartera, con un cambio aproximado de {amount}."
+    if title == "reduce single-name concentration" and amount:
+        return f"El plan recomienda reducir la concentración de una inversión en aproximadamente {amount}."
+    if title == "close a coverage gap":
+        return "El plan recomienda asegurar la vivienda principal para cerrar una brecha de cobertura."
+    return ""
+
+
 def build_story_payload(case_id: str, profile_data: dict, case_raw: dict, data_status: str) -> dict:
-    """
-    Construye las escenas del guion respetando el Contrato JSON v1.
-    No inventa cifras: toma los datos verificados del plan.
-    """
-    # Extraer el primer miembro o usar valor por defecto
+    """Build four personalized, fact-grounded story scenes from a case plan."""
+    financial = case_raw.get("financial_health_json", {})
+    score_data = financial.get("score", {})
+    score = score_data.get("published_score")
+    if score is None:
+        score = score_data.get("value")
+
     members = profile_data.get("members", [])
-    user_name = members[0].get("name", "Familia") if members else "Familia"
-    priorities = profile_data.get("family_priorities", ["education", "retirement"])
+    names = _join_names(members, case_raw)
+    priorities = [
+        str(priority).strip().lower()
+        for priority in profile_data.get("family_priorities", [])
+        if str(priority).strip()
+    ]
+    priority = priorities[0] if priorities else "other"
+    priority_label = PRIORITY_LABELS.get(priority, "otros objetivos")
+    preference_detail = _personal_detail(members)
+    goals = financial.get("goals", {}).get("goalsSummary", [])
+    selected_goal, goal_priority = _goal_for_priorities(goals, priorities)
+    goal_priority_label = PRIORITY_LABELS.get(goal_priority, "otros objetivos")
+    goal_narration, goal_metric_label, goal_metric_value = _describe_goal(selected_goal, goal_priority)
+    theme = _priority_theme(priority)
+    source_ref = f"cases/{case_id}/financial-health.json"
 
-    # Cargar datos específicos según el caso
-    fh = case_raw.get("financial_health_json", {})
-    score = fh.get("score", {}).get("value", 60) if isinstance(fh, dict) else 60
+    score_value = f"{score}/100" if score is not None else "Dato no disponible"
+    if profile_data.get("tone") == "direct":
+        score_narration = (
+            f"{names}: puntuación de salud financiera {score_value}. "
+            f"Prioridad principal del cuestionario: {priority_label}."
+        )
+    else:
+        score_narration = (
+            f"{names}, vuestro plan parte de una puntuación de salud financiera de {score_value}. "
+            f"En el cuestionario señalasteis {priority_label} como prioridad principal."
+        )
+    if preference_detail:
+        score_narration += " " + preference_detail
 
-    # Plantilla de escenas cronológicas conforme a story.schema.json
+    if profile_data.get("tone") == "direct":
+        goal_text = f"Prioridad principal: {priority_label}. {goal_narration}"
+    else:
+        goal_text = f"Vuestra prioridad principal es {priority_label}. {goal_narration}"
+    projection = _projection_for_goal(financial, selected_goal)
+    if projection and projection.get("net_worth") is not None:
+        projection_year = projection.get("year", "proyectado")
+        net_worth = _format_money(projection.get("net_worth"))
+        if profile_data.get("tone") == "direct":
+            projection_narration = (
+                f"Patrimonio neto estimado para {projection_year}: {net_worth}. "
+                "Es la diferencia entre activos y deudas."
+            )
+        else:
+            projection_narration = (
+                f"En la proyección de {projection_year}, el plan estima un patrimonio neto de "
+                f"{net_worth}. Es la diferencia entre lo que tenéis y lo que debéis."
+            )
+        if profile_data.get("literacy") == "advanced":
+            projection_narration += " La cifra está expresada en dólares nominales del año indicado."
+        projection_metric_label = f"Patrimonio neto proyectado ({projection_year})"
+        projection_metric_value = net_worth
+    else:
+        projection_narration = f"El indicador publicado para vuestro plan es {score_value}."
+        projection_metric_label = "Salud financiera"
+        projection_metric_value = score_value
+
+    moves = score_data.get("top_moves", [])
+    move = moves[0] if moves and isinstance(moves[0], dict) else {}
+    move_title = str(move.get("title", "")).strip()
+    move_label = MOVE_LABELS.get(move_title.lower(), move_title or "seguir la recomendación principal")
+    score_before = move.get("score_before", score)
+    score_after = move.get("score_after")
+    if score_after is not None:
+        action_metric_value = f"{score_before} → {score_after}/100"
+        if profile_data.get("tone") == "direct":
+            action_narration = (
+                f"Siguiente paso: {move_label}. "
+                f"El plan estima que la puntuación pasaría de {score_before} a {score_after}/100."
+            )
+        else:
+            action_narration = (
+                f"El plan destaca como siguiente paso {move_label}. "
+                f"Según la proyección del plan, la puntuación pasaría de {score_before} a {score_after}/100."
+            )
+    else:
+        action_metric_value = score_value
+        action_narration = f"El plan destaca como siguiente paso {move_label}."
+    action_detail = _describe_move_action(move)
+    if action_detail:
+        action_narration += " " + action_detail
+
     scenes = [
         {
-            "id": "intro",
+            "id": "starting_point",
             "kind": "narration",
             "year": 2026,
-            "period_label": "Hoy (2026)",
-            "title": f"Situación Actual — {user_name}",
-            "narration": f"Hola {user_name}. Vuestro plan de Sherpas muestra un Financial Health Score de {score}/100. Contáis con liquidez en caja, pero mantenéis una tarjeta al 18% APR mientras planificáis el futuro.",
-            "visual_type": "family",
-            "metric": {
-                "label": "Deuda Tarjeta (18% APR)",
-                "value": "$18,000 pendientes",
-                "source_ref": f"cases/{case_id}/financial-health.json#debt"
-            },
-            "source_refs": [f"cases/{case_id}/financial-health.json"],
-            "next_scene_id": "choose_topic",
-            "choices": [],
-            "audio_b64": ""
+            "period_label": "Hoy",
+            "visual_theme": theme,
+            "headline": f"{names}: vuestro punto de partida",
+            "narration": score_narration,
+            "metric_badge": {"label": "Salud financiera", "value": score_value, "source_ref": source_ref},
+            "source_refs": [source_ref],
+            "next_scene_id": "family_priority",
+            "audio_b64": "",
         },
         {
-            "id": "choose_topic",
-            "kind": "choice",
+            "id": "family_priority",
+            "kind": "narration",
             "year": None,
-            "period_label": "Explorar",
-            "title": "¿Qué queréis profundizar primero?",
-            "narration": "Elegid si queréis ver la proyección de educación universitaria o el plan de jubilación a largo plazo.",
-            "visual_type": "choice",
-            "metric": None,
-            "source_refs": [],
-            "next_scene_id": None,
-            "choices": [
-                {"id": "education", "label": "Educación de los hijos (529)", "next_scene_id": "education_path"},
-                {"id": "retirement", "label": "Jubilación proyectada (2048)", "next_scene_id": "retirement_path"}
-            ],
-            "audio_b64": ""
-        },
-        {
-            "id": "education_path",
-            "kind": "narration",
-            "year": 2038,
-            "period_label": "Meta 2038",
-            "title": "Fondo Universitario para los Hijos",
-            "narration": "Para cubrir la universidad de los niños sin alterar vuestro nivel de vida, el plan proyecta una necesidad de ahorro de $4,609 anuales mediante cuentas 529 con ventajas fiscales.",
-            "visual_type": "goal",
-            "metric": {
-                "label": "Necesidad acumulada 529",
-                "value": "$113,509 proyectados",
-                "source_ref": f"cases/{case_id}/financial-health.json#education"
+            "period_label": "Vuestra prioridad",
+            "visual_theme": _priority_theme(goal_priority),
+            "headline": f"Una meta concreta: {goal_priority_label}",
+            "narration": goal_text,
+            "metric_badge": {
+                "label": goal_metric_label,
+                "value": goal_metric_value,
+                "source_ref": source_ref,
             },
-            "source_refs": [f"cases/{case_id}/financial-health.json"],
-            "next_scene_id": "ending",
-            "choices": [],
-            "audio_b64": ""
+            "source_refs": [source_ref],
+            "next_scene_id": "plan_projection",
+            "audio_b64": "",
         },
         {
-            "id": "retirement_path",
+            "id": "plan_projection",
             "kind": "narration",
-            "year": 2048,
-            "period_label": "Meta 2048",
-            "title": "Jubilación Tranquila y Patrimonio",
-            "narration": "Al alcanzar la jubilación en 2048, los ingresos garantizados cubrirán el 93% de vuestros gastos, manteniendo una reserva proyectada al final del plan sin agotar ahorros.",
-            "visual_type": "chart",
-            "metric": {
-                "label": "Cobertura de gastos",
-                "value": "93% garantizado",
-                "source_ref": f"cases/{case_id}/financial-health.json#retirement"
+            "year": projection.get("year") if projection else None,
+            "period_label": "Lo que proyecta el plan",
+            "visual_theme": "early_retirement" if priority == "retirement" else theme,
+            "headline": "El horizonte que dibujan vuestros datos",
+            "narration": projection_narration,
+            "metric_badge": {
+                "label": projection_metric_label,
+                "value": projection_metric_value,
+                "source_ref": source_ref,
             },
-            "source_refs": [f"cases/{case_id}/financial-health.json"],
-            "next_scene_id": "ending",
-            "choices": [],
-            "audio_b64": ""
+            "source_refs": [source_ref],
+            "next_scene_id": "first_step",
+            "audio_b64": "",
         },
         {
-            "id": "ending",
+            "id": "first_step",
             "kind": "ending",
             "year": 2026,
-            "period_label": "Presente",
-            "title": "Primeros Pasos Recomendados",
-            "narration": "Para poner este plan en marcha hoy: 1) Destinar parte del exceso de caja a saldar la tarjeta al 18%. 2) Cubrir vacíos de seguro de vida. 3) Iniciar las aportaciones al fondo 529.",
-            "visual_type": "summary",
-            "metric": {
-                "label": "Exceso de caja disponible",
-                "value": "$60,223 por optimizar",
-                "source_ref": f"cases/{case_id}/financial-health.json#cash"
+            "period_label": "Un primer paso",
+            "visual_theme": "financial_shield",
+            "headline": "Una acción concreta del plan",
+            "narration": action_narration,
+            "metric_badge": {
+                "label": "Puntuación tras la acción",
+                "value": action_metric_value,
+                "source_ref": source_ref,
             },
-            "source_refs": [f"cases/{case_id}/financial-health.json"],
+            "source_refs": [source_ref],
             "next_scene_id": None,
-            "choices": [],
-            "audio_b64": ""
-        }
+            "audio_b64": "",
+        },
     ]
 
     return {
         "schema_version": "1.0",
         "case_id": case_id,
-        "title": f"Historia Financiera — {user_name}",
+        "title": f"Historia financiera — {names}",
         "data_status": data_status,
-        "disclaimer": "Demostración basada en el plan financiero oficial de Sherpas Wealth.",
-        "start_scene_id": "intro",
-        "scenes": scenes
+        "disclaimer": "Escenas basadas en los datos del plan financiero de la familia.",
+        "start_scene_id": "starting_point",
+        "scenes": scenes,
     }

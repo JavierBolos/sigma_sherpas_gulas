@@ -64,7 +64,7 @@ class VideoQuestionRequest(BaseModel):
 def get_llm_client() -> OpenAI:
     team_key = os.environ.get("TEAM_KEY", "").strip()
     return OpenAI(
-        base_url="https://llm-hackathon.sherpaswealth.com/v1",
+        base_url="https://llm-hackathon.sherpaswealth.com",
         api_key=team_key,
         timeout=30.0
     )
@@ -126,7 +126,21 @@ async def ask_during_video(req: VideoQuestionRequest):
             ]
         )
         answer = res.choices[0].message.content.strip()
-        return {"answer": answer, "audio_b64": ""}
+        # --- Generación de audio TTS (Base64) ---
+        
+        audio_b64 = ""
+        try:
+            speech_res = llm.audio.speech.create(
+                model="tts-1",
+                voice="alloy",  # Voces disponibles: alloy, echo, fable, onyx, nova, shimmer
+                input=answer
+            )
+            audio_b64 = base64.b64encode(speech_res.content).decode("utf-8")
+        except Exception:
+            # Si el proxy no soporta TTS o falla la petición, devuelve texto normal sin dar error 500
+            audio_b64 = ""
+
+        return {"answer": answer, "audio_b64": audio_b64}
 
     except Exception as e:
         return {"answer": f"Respuesta basada en datos de Sherpas: {req.scene_metric}", "audio_b64": ""}
