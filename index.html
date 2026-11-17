@@ -4,14 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sherpas Wealth — Historias Financieras Interactivas</title>
+  
+  <!-- CSS del Cuestionario de Persona A -->
+  <link rel="stylesheet" href="/static/questionnaire.css">
+
   <style>
     :root {
       --primary: #2563eb;
-      --primary-hover: #1d4ed8;
       --bg-slate: #f8fafc;
       --card-bg: #ffffff;
       --text-main: #0f172a;
-      --text-muted: #64748b;
       --border-color: #e2e8f0;
     }
 
@@ -27,7 +29,6 @@
 
     .container { max-width: 900px; margin: 0 auto; }
 
-    /* Header */
     header {
       display: flex;
       justify-content: space-between;
@@ -36,14 +37,12 @@
       padding: 1.25rem 1.5rem;
       border-radius: 14px;
       border: 1px solid var(--border-color);
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
       margin-bottom: 1.5rem;
       flex-wrap: wrap;
       gap: 1rem;
     }
 
     .logo-area { display: flex; align-items: center; gap: 0.75rem; }
-
     .logo-icon {
       background: var(--primary);
       color: white;
@@ -57,37 +56,18 @@
       justify-content: center;
     }
 
-    .brand-title { font-size: 1.25rem; font-weight: 700; color: var(--text-main); }
-    .brand-subtitle { font-size: 0.8rem; color: var(--text-muted); }
-
-    .selector-group { display: flex; align-items: center; gap: 0.5rem; }
-
-    label { font-size: 0.9rem; font-weight: 600; color: var(--text-muted); }
+    .brand-title { font-size: 1.25rem; font-weight: 700; }
+    .brand-subtitle { font-size: 0.8rem; color: #64748b; }
 
     select {
       padding: 0.6rem 0.9rem;
       font-size: 0.95rem;
       border-radius: 8px;
       border: 1px solid #cbd5e1;
-      background-color: #ffffff;
-      color: var(--text-main);
       font-weight: 600;
       cursor: pointer;
     }
 
-    .btn-reset {
-      background: #f1f5f9;
-      color: #475569;
-      border: 1px solid #cbd5e1;
-      padding: 0.5rem 0.9rem;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      font-size: 0.85rem;
-    }
-    .btn-reset:hover { background: #e2e8f0; color: #1e293b; }
-
-    /* Indicador de Estado */
     .status-bar {
       display: flex;
       justify-content: space-between;
@@ -111,14 +91,12 @@
       text-transform: uppercase;
     }
 
-    /* Estados de carga y error */
     .loading-state {
       background: var(--card-bg);
       border: 1px solid var(--border-color);
       border-radius: 14px;
       padding: 3rem 1.5rem;
       text-align: center;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     }
 
     .spinner {
@@ -140,19 +118,11 @@
       padding: 1.5rem;
       border-radius: 12px;
     }
-
-    footer {
-      text-align: center;
-      margin-top: 3rem;
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
   </style>
 </head>
 <body>
 
   <div class="container">
-    <!-- Header -->
     <header>
       <div class="logo-area">
         <div class="logo-icon">S</div>
@@ -161,75 +131,66 @@
           <div class="brand-subtitle">Experiencia Financiera Interactiva</div>
         </div>
       </div>
-      <div class="selector-group">
-        <label for="family-select">Familia:</label>
+      <div>
+        <label for="family-select"><strong>Familia:</strong> </label>
         <select id="family-select" onchange="initFlow()">
           <option value="timothy-melanie-weah">Timothy & Melanie Weah</option>
           <option value="michael-carter">Michael Carter</option>
           <option value="daniel-emily-johnson">Daniel & Emily Johnson</option>
           <option value="samantha-lewis">Samantha Lewis</option>
         </select>
-        <button class="btn-reset" onclick="initFlow()">🔄 Reiniciar</button>
       </div>
     </header>
 
-    <!-- Indicador de Estado -->
     <div class="status-bar">
       <span>Conectado a la API de Sherpas Wealth (Contrato v1)</span>
-      <span class="status-badge" id="data-status-badge">Estado Datos</span>
+      <span class="status-badge" id="data-status-badge">Origen Datos</span>
     </div>
 
-    <!-- Contenedor Cuestionario (Frente A) -->
-    <div id="questionnaire-root"></div>
+    <!-- ID exacto exigido por el componente de Julián -->
+    <div id="questionnaire-container"></div>
 
-    <!-- Contenedor Reproductor (Frente C) -->
+    <!-- Contenedor del Reproductor Interactivo -->
     <div id="video-root"></div>
   </div>
 
-  <footer>
-    Sherpas × UPV Hackathon 2026 — Equipo <code>sigma_sherpas_gulas</code>
-  </footer>
-
-  <!-- Módulos JavaScript independientes -->
+  <!-- Scripts de los módulos -->
   <script src="/static/questionnaire.js"></script>
   <script src="/static/video.js"></script>
 
   <script>
     function initFlow() {
-      const caseId = document.getElementById("family-select").value;
-      const qRoot = document.getElementById("questionnaire-root");
+      const selectedCaseId = document.getElementById("family-select").value;
+      const qContainer = document.getElementById("questionnaire-container");
       const vRoot = document.getElementById("video-root");
 
-      qRoot.style.display = "block";
-      qRoot.innerHTML = "";
+      qContainer.style.display = "block";
+      qContainer.innerHTML = "";
       vRoot.innerHTML = "";
 
       if (typeof window.SherpasQuestionnaire === "undefined") {
-        qRoot.innerHTML = `
-          <div class="error-card">
-            <strong>⚠️ Módulo static/questionnaire.js no encontrado.</strong><br>
-            Asegúrate de haber creado el archivo <code>static/questionnaire.js</code>.
-          </div>`;
+        qContainer.innerHTML = `<div class="error-card">⚠️ No se encuentra static/questionnaire.js</div>`;
         return;
       }
 
-      // 1. Montar Cuestionario (Frente A)
+      // Integración exacta según el snippet de Julián
       window.SherpasQuestionnaire.mount({
-        container: qRoot,
-        caseId: caseId,
+        container: qContainer,
+        caseId: selectedCaseId,
         onSubmit: async function (questionnaireRequestJson) {
-          qRoot.style.display = "none";
+          // Ocultar cuestionario y mostrar pantalla de carga
+          qContainer.style.display = "none";
           vRoot.innerHTML = `
             <div class="loading-state">
               <div class="spinner"></div>
               <h3>Generando vuestra historia financiera personalizada...</h3>
               <p style="color: #64748b; font-size: 0.9rem; margin-top: 0.5rem;">
-                Analizando el plan de Sherpas e integrando vuestras prioridades emocionales.
+                Analizando el plan de Sherpas e integrando vuestras prioridades.
               </p>
             </div>`;
 
           try {
-            // 2. Enviar datos al Backend (Frente B)
+            // Envío al Backend FastAPI (Frente B)
             const response = await fetch("/api/story", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -241,27 +202,23 @@
               throw new Error(errData.detail || `Error HTTP ${response.status}`);
             }
 
-            const storyResponseJson = await response.json();
+            const storyData = await response.json();
 
-            // Actualizar badge con el origen de los datos (mcp / local_case)
+            // Actualizar el estado de la fuente (mcp / local_case)
             const badge = document.getElementById("data-status-badge");
-            if (badge) badge.textContent = storyResponseJson.data_status || "OK";
+            if (badge) badge.textContent = storyData.data_status || "OK";
 
             vRoot.innerHTML = "";
 
             if (typeof window.SherpasVideo === "undefined") {
-              vRoot.innerHTML = `
-                <div class="error-card">
-                  <strong>⚠️ Módulo static/video.js no encontrado.</strong><br>
-                  Falta el archivo <code>static/video.js</code> para renderizar la secuencia de escenas.
-                </div>`;
+              vRoot.innerHTML = `<div class="error-card">⚠️ No se encuentra static/video.js</div>`;
               return;
             }
 
-            // 3. Montar Reproductor de Vídeo (Frente C)
+            // Renderizar el vídeo (Frente C)
             window.SherpasVideo.mount({
               container: vRoot,
-              story: storyResponseJson,
+              story: storyData,
               onAsk: async function (videoQuestionRequestJson) {
                 const askRes = await fetch("/api/video-ask", {
                   method: "POST",
@@ -275,9 +232,8 @@
           } catch (err) {
             vRoot.innerHTML = `
               <div class="error-card">
-                <h3>⚠️ Error al conectar con el servidor</h3>
+                <h3>⚠️ Error al generar la historia</h3>
                 <p>${err.message}</p>
-                <button class="btn-reset" onclick="initFlow()" style="margin-top: 1rem;">Intentar de nuevo</button>
               </div>`;
           }
         }
