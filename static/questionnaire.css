@@ -91,13 +91,21 @@
 .sq-progress::-webkit-progress-value {
   border-radius: 999px;
   background: #2563eb;
-  transition: width 180ms ease;
+  transition: width 350ms ease, background-color 350ms ease;
 }
 
 .sq-progress::-moz-progress-bar {
   border-radius: 999px;
   background: #2563eb;
-  transition: width 180ms ease;
+  transition: width 350ms ease, background-color 350ms ease;
+}
+
+.sq-progress.is-complete::-webkit-progress-value {
+  background: #10b981;
+}
+
+.sq-progress.is-complete::-moz-progress-bar {
+  background: #10b981;
 }
 
 .sq-section {
@@ -427,4 +435,28 @@
     transition: none;
     animation: none;
   }
+}
+
+.sq-question-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.5rem;
+}
+
+.sq-suggestion-chip {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sq-suggestion-chip:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #0f172a;
 }

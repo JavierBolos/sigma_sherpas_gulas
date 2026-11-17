@@ -257,6 +257,7 @@
       if (String(state.question || "").trim()) completedSections += 1;
 
       progress.value = completedSections;
+      progress.classList.toggle("is-complete", completedSections === 3);
       progressText.textContent = completedSections + " de 3 secciones completadas";
       progress.setAttribute("aria-valuetext", progressText.textContent);
     }
@@ -585,7 +586,8 @@
     styleSection.appendChild(styleGrid);
 
     // Pregunta / motivo general
-  const qField = el("div", "sq-field");
+  // Pregunta / motivo general
+    const qField = el("div", "sq-field");
     qField.style.marginTop = "0.65rem";
     qField.appendChild(el("label", "", "¿Qué os gustaría entender hoy de vuestro plan? *"));
     const qInput = el("input", "sq-input");
@@ -598,10 +600,30 @@
       updateProgress();
     });
     qField.appendChild(qInput);
+
+    // Preguntas rápidas clicables
+    const suggestedQuestions = [
+      "¿Llegamos cómodos a la jubilación manteniendo nuestro nivel de vida?",
+      "¿Cómo afecta comprar una segunda vivienda a nuestros ahorros?",
+      "¿Qué pasa con el plan si uno de los dos deja de trabajar 2 años?"
+    ];
+    const suggestionsBox = el("div", "sq-question-suggestions");
+    suggestedQuestions.forEach((text) => {
+      const chip = el("button", "sq-suggestion-chip", text);
+      chip.type = "button";
+      chip.addEventListener("click", () => {
+        qInput.value = text;
+        state.question = text;
+        updateProgress();
+      });
+      suggestionsBox.appendChild(chip);
+    });
+    qField.appendChild(suggestionsBox);
+
+    styleSection.appendChild(qField);
     styleSection.appendChild(qField);
 
     card.appendChild(styleSection);
-
     // Botón enviar
     const submitBtn = el("button", "sq-btn-primary", "Generar nuestra historia personalizada");
     submitBtn.type = "button";
