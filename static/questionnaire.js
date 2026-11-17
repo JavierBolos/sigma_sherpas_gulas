@@ -176,7 +176,7 @@
     }
 
     const preset = CASE_DEFAULTS[caseId];
-    const state = {
+   const state = {
       members: preset.members.map((m) => ({
         name: m.name,
         role: m.role,
@@ -185,10 +185,10 @@
         non_negotiables: "",
         interests: ""
       })),
-      family_priorities: [...preset.defaultPriorities],
+      family_priorities: [],
       literacy: "beginner",
       tone: "warm",
-      question: "Queremos entender cómo evoluciona nuestro plan financiero."
+      question: ""
     };
 
     const card = el("div", "sq-card");
@@ -585,12 +585,13 @@
     styleSection.appendChild(styleGrid);
 
     // Pregunta / motivo general
-    const qField = el("div", "sq-field");
+  const qField = el("div", "sq-field");
     qField.style.marginTop = "0.65rem";
     qField.appendChild(el("label", "", "¿Qué os gustaría entender hoy de vuestro plan? *"));
     const qInput = el("input", "sq-input");
     qInput.type = "text";
     qInput.maxLength = 500;
+    qInput.placeholder = "Ej: ¿Podemos permitirnos viajar cada año sin retrasar la jubilación?";
     qInput.value = state.question;
     qInput.addEventListener("input", (e) => {
       state.question = e.target.value;
