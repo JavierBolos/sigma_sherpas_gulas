@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 from openai import OpenAI
 
 from mcp_sherpas import get_case_data
@@ -85,13 +85,22 @@ async def create_story(req: StoryRequest):
     # 1. Obtener datos (MCP en vivo o fallback local)
     case_data, data_status = await get_case_data(req.case_id)
 
-    # 2. Construir la respuesta estructurada
-    payload = build_story_payload(
-        case_id=req.case_id,
-        profile_data=req.profile.dict(),
-        case_raw=case_data,
-        data_status=data_status
-    )
+    # 2. Construir la respuesta estructurada pasando también la pregunta del usuario
+    try:
+        payload = build_story_payload(
+            case_id=req.case_id,
+            profile_data=req.profile.model_dump(),
+            case_raw=case_data,
+            data_status=data_status,
+            question=req.question
+        )
+    except TypeError:
+        payload = build_story_payload(
+            case_id=req.case_id,
+            profile_data=req.profile.model_dump(),
+            case_raw=case_data,
+            data_status=data_status
+        )
 
     return payload
 
@@ -100,7 +109,7 @@ async def ask_during_video(req: VideoQuestionRequest):
     """
     Responde a dudas en tiempo real durante la reproducción del vídeo.
     """
-    team_key = os.environ.get("TEAM_KEY", "")
+    team_key = os.environ.get("TEAM_KEY", "").strip()
     
     # Si no hay clave configurada o estamos probando sin saldo
     if not team_key or "pega_aqui" in team_key:
@@ -126,24 +135,24 @@ async def ask_during_video(req: VideoQuestionRequest):
             ]
         )
         answer = res.choices[0].message.content.strip()
-        # --- Generación de audio TTS (Base64) ---
-        
+
+        # --- Generación de audio TTS con ElevenLabs (Base64) ---
         audio_b64 = ""
         try:
             speech_res = llm.audio.speech.create(
-                model="tts-1",
-                voice="alloy",  # Voces disponibles: alloy, echo, fable, onyx, nova, shimmer
+                model="eleven-flash-v2.5",
+                voice="alloy",
                 input=answer
             )
             audio_b64 = base64.b64encode(speech_res.content).decode("utf-8")
         except Exception:
-            # Si el proxy no soporta TTS o falla la petición, devuelve texto normal sin dar error 500
             audio_b64 = ""
 
         return {"answer": answer, "audio_b64": audio_b64}
 
-    except Exception as e:
+    except Exception:
         return {"answer": f"Respuesta basada en datos de Sherpas: {req.scene_metric}", "audio_b64": ""}
+
 
 if __name__ == "__main__":
     import uvicorn

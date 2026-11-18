@@ -1,4 +1,7 @@
+import os
 import re
+import json
+from openai import OpenAI
 
 
 PRIORITY_LABELS = {
@@ -41,6 +44,8 @@ MOVE_LABELS = {
     "close a coverage gap": "cerrar una brecha de cobertura",
     "reduce single-name concentration": "reducir la concentración de una inversión",
 }
+
+ALLOWED_THEMES = {"family_travel", "early_retirement", "dream_home", "financial_shield"}
 
 
 def _format_money(value):
@@ -235,7 +240,151 @@ def _describe_move_action(move):
     return ""
 
 
-def build_story_payload(case_id: str, profile_data: dict, case_raw: dict, data_status: str) -> dict:
+def _build_llm_scenes(
+    case_id: str,
+    names: str,
+    profile_data: dict,
+    case_raw: dict,
+    question: str,
+    base_scenes: list,
+    source_ref: str,
+) -> list | None:
+    """Genera narraciones críticas, detalladas y adaptadas al nivel técnico usando gpt-5-mini."""
+    team_key = os.environ.get("TEAM_KEY", "").strip()
+    if not team_key or "pega_aqui" in team_key:
+        return None
+
+    literacy = str(profile_data.get("literacy", "beginner")).strip().lower()
+    tone = str(profile_data.get("tone", "warm")).strip().lower()
+
+    literacy_rules = {
+        "beginner": (
+            "NIVEL FINANCIERO: BÁSICO (beginner). Explica todo con claridad pedagógica, "
+            "evitando jerga técnica innecesaria y traduciendo cualquier concepto financiero "
+            "a impacto real en el día a día de la familia."
+        ),
+        "intermediate": (
+            "NIVEL FINANCIERO: INTERMEDIO (intermediate). Utiliza terminología financiera "
+            "práctica con explicaciones claras: flujo de caja libre, tasa de ahorro, liquidez, "
+            "fondo de emergencia, tipo de interés, amortización y diversificación."
+        ),
+        "advanced": (
+            "NIVEL FINANCIERO: AVANZADO (advanced). Emplea análisis financiero riguroso y "
+            "tecnicismos precisos: TAE/APR, coste de oportunidad del capital, asignación estratégica "
+            "de activos (glide path), ratio deuda-ingresos (DTI), tasa segura de retiro (SWR), "
+            "riesgo de concentración idiosincrático, brecha de cobertura actuarialmente estimada "
+            "y proyecciones en dólares nominales."
+        ),
+    }.get(literacy, "")
+
+    tone_rules = (
+        "TONO: Directo, analítico y ejecutivo, sin rodeos."
+        if tone == "direct"
+        else "TONO: Empático y cercano a la familia, pero firmemente objetivo, honesto y crítico con los números."
+    )
+
+    # Compactamos los datos del caso para no saturar contexto manteniendo todas las cifras
+    financial_summary = json.dumps(case_raw.get("financial_health_json", case_raw), ensure_ascii=False)
+    if len(financial_summary) > 18000:
+        financial_summary = financial_summary[:18000]
+
+    profile_summary = json.dumps(profile_data, ensure_ascii=False)
+
+    system_prompt = (
+        "Eres un asesor financiero patrimonial senior y analista crítico de Sherpas Wealth. "
+        "Tu tarea es analizar en profundidad los datos financieros reales de una familia (JSON del plan) "
+        "cruzándolos con su cuestionario personal para generar el guion narrado de un vídeo explicativo de 4 escenas.\n\n"
+        f"{literacy_rules}\n"
+        f"{tone_rules}\n\n"
+        "REGLAS ESTRICTAS DE ANÁLISIS Y RIGOR:\n"
+        "1. CERO INVENCIONES: Usa EXCLUSIVAMENTE cifras, activos, deudas, porcentajes, años y acciones "
+        "que aparezcan literalmente en los datos del plan de Sherpas. Si un dato no está, no lo inventes.\n"
+        "2. DIAGNÓSTICO OBJETIVO Y CRÍTICO: No te limites a describir cifras de forma complaciente. "
+        "Señala con claridad los puntos débiles, ineficiencias o riesgos del plan actual (por ejemplo: "
+        "efectivo ocioso frente a deuda revolving cara, brechas de cobertura de vida o responsabilidad civil, "
+        "concentración excesiva en un solo activo, tasa de ahorro insuficiente o desviación respecto al glide path).\n"
+        "3. RESPUESTA DIRECTA A LA PREGUNTA Y PRIORIDADES: Responde explícitamente a la pregunta principal "
+        "del cuestionario, respeta sus 'non_negotiables' (lo que no quieren sacrificar) y conecta sus "
+        "preocupaciones ('concerns') y aspiraciones ('aspirations') con los números reales.\n"
+        "4. PAUTAS ACCIONABLES DETALLADAS: En las escenas 3 y 4, detalla qué movimientos exactos deben ejecutar "
+        "(basándote en 'top_moves' y el balance/flujo del plan), en qué orden de prioridad, qué impacto numérico "
+        "tienen en su puntuación y patrimonio, y qué trade-off o sacrificio conllevan.\n"
+        "5. EXTENSIÓN POR ESCENA: Cada 'narration' debe ser rica, detallada y bien argumentada (entre 65 y 110 palabras "
+        "por escena, apta para ser locutada en voz alta con fluidez, sin listas con viñetas ni markdown).\n\n"
+        "FORMATO DE SALIDA OBLIGATORIO:\n"
+        "Devuelve ÚNICAMENTE un objeto JSON válido con la clave 'scenes', que contenga exactamente 4 objetos "
+        "correspondientes a los ids ['starting_point', 'family_priority', 'plan_projection', 'first_step']. "
+        "Cada objeto debe tener exactamente estas claves:\n"
+        "- 'id': string\n"
+        "- 'headline': string (titular potente de máximo 65 caracteres)\n"
+        "- 'narration': string (explicación detallada y crítica en español, sin markdown)\n"
+        "- 'metric_label': string (etiqueta corta de la métrica clave de esa escena)\n"
+        "- 'metric_value': string (valor numérico o indicador exacto extraído del plan)\n"
+        "- 'visual_theme': string (uno de: 'family_travel', 'early_retirement', 'dream_home', 'financial_shield')"
+    )
+
+    user_prompt = (
+        f"FAMILIA: {names} (case_id: {case_id})\n"
+        f"PREGUNTA PRINCIPAL DEL CUESTIONARIO: {question or 'No especificada; enfócate en sus prioridades principales.'}\n\n"
+        f"PERFIL Y PREFERENCIAS DEL CUESTIONARIO:\n{profile_summary}\n\n"
+        f"DATOS FINANCIEROS COMPLETOS DEL PLAN (MCP SHERPAS):\n{financial_summary}"
+    )
+
+    try:
+        client = OpenAI(
+            base_url="https://llm-hackathon.sherpaswealth.com",
+            api_key=team_key,
+            timeout=35.0,
+        )
+        res = client.chat.completions.create(
+            model="gpt-5-mini",
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        raw_content = res.choices[0].message.content.strip()
+        parsed = json.loads(raw_content)
+        ai_scenes = parsed.get("scenes", [])
+        if not isinstance(ai_scenes, list) or len(ai_scenes) < 4:
+            return None
+
+        by_id = {str(s.get("id", "")).strip(): s for s in ai_scenes if isinstance(s, dict)}
+        merged_scenes = []
+        for idx, base in enumerate(base_scenes):
+            ai_item = by_id.get(base["id"]) or (ai_scenes[idx] if idx < len(ai_scenes) else {})
+            headline = str(ai_item.get("headline", "")).strip() or base["headline"]
+            narration = str(ai_item.get("narration", "")).strip() or base["narration"]
+            metric_label = str(ai_item.get("metric_label", "")).strip() or base["metric_badge"]["label"]
+            metric_value = str(ai_item.get("metric_value", "")).strip() or base["metric_badge"]["value"]
+            theme = str(ai_item.get("visual_theme", "")).strip()
+            if theme not in ALLOWED_THEMES:
+                theme = base["visual_theme"]
+
+            merged = dict(base)
+            merged["headline"] = headline
+            merged["narration"] = narration
+            merged["visual_theme"] = theme
+            merged["metric_badge"] = {
+                "label": metric_label,
+                "value": metric_value,
+                "source_ref": source_ref,
+            }
+            merged_scenes.append(merged)
+
+        return merged_scenes
+    except Exception:
+        return None
+
+
+def build_story_payload(
+    case_id: str,
+    profile_data: dict,
+    case_raw: dict,
+    data_status: str,
+    question: str = "",
+) -> dict:
     """Build four personalized, fact-grounded story scenes from a case plan."""
     financial = case_raw.get("financial_health_json", {})
     score_data = financial.get("score", {})
@@ -278,6 +427,9 @@ def build_story_payload(case_id: str, profile_data: dict, case_raw: dict, data_s
         goal_text = f"Prioridad principal: {priority_label}. {goal_narration}"
     else:
         goal_text = f"Vuestra prioridad principal es {priority_label}. {goal_narration}"
+    if question:
+        goal_text += f" Sobre vuestra consulta («{question[:140]}»), analizamos su encaje con vuestros recursos."
+
     projection = _projection_for_goal(financial, selected_goal)
     if projection and projection.get("net_worth") is not None:
         projection_year = projection.get("year", "proyectado")
@@ -326,7 +478,7 @@ def build_story_payload(case_id: str, profile_data: dict, case_raw: dict, data_s
     if action_detail:
         action_narration += " " + action_detail
 
-    scenes = [
+    base_scenes = [
         {
             "id": "starting_point",
             "kind": "narration",
@@ -393,6 +545,16 @@ def build_story_payload(case_id: str, profile_data: dict, case_raw: dict, data_s
         },
     ]
 
+    llm_scenes = _build_llm_scenes(
+        case_id=case_id,
+        names=names,
+        profile_data=profile_data,
+        case_raw=case_raw,
+        question=question,
+        base_scenes=base_scenes,
+        source_ref=source_ref,
+    )
+
     return {
         "schema_version": "1.0",
         "case_id": case_id,
@@ -400,5 +562,5 @@ def build_story_payload(case_id: str, profile_data: dict, case_raw: dict, data_s
         "data_status": data_status,
         "disclaimer": "Escenas basadas en los datos del plan financiero de la familia.",
         "start_scene_id": "starting_point",
-        "scenes": scenes,
+        "scenes": llm_scenes if llm_scenes is not None else base_scenes,
     }
