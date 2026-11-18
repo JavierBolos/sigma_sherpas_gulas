@@ -1,5 +1,6 @@
 # mcp_sherpas.py
 import json
+import logging
 import os
 from pathlib import Path
 import httpx
@@ -9,10 +10,13 @@ from fastapi import HTTPException
 
 BASE_DIR = Path(__file__).resolve().parent
 CASES_DIR = BASE_DIR / "cases"
+logger = logging.getLogger(__name__)
 
 def get_mcp_config():
     mcp_url = os.environ.get("MCP_URL", "https://mcp-hackathon.sherpaswealth.com/mcp").strip()
     mcp_token = os.environ.get("MCP_TOKEN", "").strip()
+    if not mcp_token:
+        raise ValueError("Falta MCP_TOKEN en la configuración local.")
     return mcp_url, {"Authorization": f"Bearer {mcp_token}"}
 
 def extract_mcp_text(result) -> str:
@@ -23,6 +27,15 @@ def extract_mcp_text(result) -> str:
         else:
             chunks.append(str(item))
     return "\n".join(chunks)
+
+def parse_mcp_json(text: str, part: str) -> dict:
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"MCP devolvió JSON no válido para {part}.") from error
+    if not isinstance(data, dict):
+        raise ValueError(f"MCP devolvió un objeto no válido para {part}.")
+    return data
 
 async def fetch_from_mcp_live(case_id: str) -> dict:
     """Intenta traer el caso completo desde el servidor MCP."""
@@ -74,13 +87,22 @@ async def get_case_data(case_id: str) -> tuple[dict, str]:
     """
     try:
         raw_mcp = await fetch_from_mcp_live(case_id)
-        if raw_mcp.get("financial_health"):
-            # Para facilitar la extracción, también leemos el JSON local si existe
-            local_fallback = load_from_local_cases(case_id)
-            local_fallback["mcp_raw"] = raw_mcp
-            return local_fallback, "mcp"
-    except Exception as e:
-        print(f"[AVISO B] No se pudo conectar al MCP ({e}). Usando datos locales de cases/...")
+        if not raw_mcp.get("financial_health"):
+            raise ValueError("MCP no devolvió financial-health para el caso solicitado.")
+        data = {
+            "financial_health_json": parse_mcp_json(
+                raw_mcp["financial_health"], "financial-health"
+            )
+        }
+        if raw_mcp.get("investment_analysis"):
+            data["investment_analysis_json"] = parse_mcp_json(
+                raw_mcp["investment_analysis"], "investment-analysis"
+            )
+        if raw_mcp.get("persona"):
+            data["persona_md"] = raw_mcp["persona"]
+        return data, "mcp"
+    except Exception as error:
+        logger.warning("No se pudo usar el MCP; se consultarán los archivos locales: %s", error)
 
     local_data = load_from_local_cases(case_id)
     return local_data, "local_case"

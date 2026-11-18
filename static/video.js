@@ -41,6 +41,21 @@
   function mount({ container, story, onAsk } = {}) {
     if (!(container instanceof HTMLElement)) throw new Error('container debe ser un elemento HTML.');
     const sceneMap = validateStory(story);
+    function longestPathLength(sceneId, ancestors = new Set()) {
+      if (ancestors.has(sceneId)) return 0;
+      const scene = sceneMap.get(sceneId);
+      if (!scene) return 0;
+      const nextIds = scene.kind === 'choice'
+        ? (scene.choices || []).map((choice) => choice.next_scene_id)
+        : scene.next_scene_id ? [scene.next_scene_id] : [];
+      const nextAncestors = new Set(ancestors);
+      nextAncestors.add(sceneId);
+      return 1 + Math.max(
+        0,
+        ...nextIds.map((nextId) => longestPathLength(nextId, nextAncestors))
+      );
+    }
+    const totalStorySteps = Math.max(1, longestPathLength(story.start_scene_id));
     const askHandler = typeof onAsk === 'function' ? onAsk : null;
     let currentId = story.start_scene_id;
     let history = [];
@@ -62,6 +77,10 @@
     const disclaimer = make('p', 'sv-disclaimer', story.disclaimer);
     const step = make('div', 'sv-step', '');
     const timeline = make('div', 'sv-timeline');
+    const progress = make('progress', 'sv-progress');
+    progress.max = totalStorySteps;
+    progress.value = 1;
+    progress.setAttribute('aria-label', 'Progreso de la historia');
     const stage = make('main', 'sv-stage');
     const motion = make('div', 'sv-motion');
     motion.setAttribute('aria-hidden', 'true');
@@ -101,7 +120,7 @@
     ask.type = 'submit';
     questions.append(questionLabel, questionInput, ask);
 
-    top.append(eyebrow, storyTitle, disclaimer, step, timeline);
+    top.append(eyebrow, storyTitle, disclaimer, step, timeline, progress);
     device.append(top, stage, controls, questions);
     root.append(device);
     container.append(root);
@@ -204,6 +223,9 @@
         const node = make('span', 'sv-timeline-dot' + (i === items.length - 1 ? ' is-current' : ''), label);
         timeline.append(node);
       }
+      progress.value = scene.kind === 'ending'
+        ? totalStorySteps
+        : Math.min(history.length + 1, totalStorySteps);
       step.textContent = scene.kind === 'choice' ? 'TÚ ELIGES EL RECORRIDO' : scene.kind === 'ending' ? 'EL SIGUIENTE PASO' : 'UN MOMENTO DE VUESTRA HISTORIA';
     }
     function render() {
