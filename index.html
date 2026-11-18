@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sherpas Wealth — Historias Financieras Interactivas</title>
   
-  <!-- CSS del Cuestionario de Persona A -->
+  <!-- CSS del Cuestionario y del Reproductor de Vídeo -->
   <link rel="stylesheet" href="/static/questionnaire.css">
+  <link rel="stylesheet" href="/static/video.css">
 
   <style>
     :root {
@@ -118,6 +119,27 @@
       padding: 1.5rem;
       border-radius: 12px;
     }
+
+    .back-bar {
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: flex-start;
+    }
+
+    .btn-back {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      color: #1e293b;
+      padding: 0.5rem 0.9rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-back:hover {
+      background: #f1f5f9;
+    }
   </style>
 </head>
 <body>
@@ -147,10 +169,7 @@
       <span class="status-badge" id="data-status-badge">Origen Datos</span>
     </div>
 
-    <!-- ID exacto exigido por el componente de Julián -->
     <div id="questionnaire-container"></div>
-
-    <!-- Contenedor del Reproductor Interactivo -->
     <div id="video-root"></div>
   </div>
 
@@ -173,12 +192,10 @@
         return;
       }
 
-      // Integración exacta según el snippet de Julián
       window.SherpasQuestionnaire.mount({
         container: qContainer,
         caseId: selectedCaseId,
         onSubmit: async function (questionnaireRequestJson) {
-          // Ocultar cuestionario y mostrar pantalla de carga
           qContainer.style.display = "none";
           vRoot.innerHTML = `
             <div class="loading-state">
@@ -190,7 +207,6 @@
             </div>`;
 
           try {
-            // Envío al Backend FastAPI (Frente B)
             const response = await fetch("/api/story", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -204,7 +220,6 @@
 
             const storyData = await response.json();
 
-            // Actualizar el estado de la fuente (mcp / local_case)
             const badge = document.getElementById("data-status-badge");
             if (badge) badge.textContent = storyData.data_status || "OK";
 
@@ -215,9 +230,25 @@
               return;
             }
 
-            // Renderizar el vídeo (Frente C)
+            // Botón para volver a editar el cuestionario conservando los datos
+            const backBar = document.createElement("div");
+            backBar.className = "back-bar";
+            const backBtn = document.createElement("button");
+            backBtn.type = "button";
+            backBtn.className = "btn-back";
+            backBtn.textContent = "← Editar respuestas del cuestionario";
+            backBtn.onclick = function () {
+              vRoot.innerHTML = "";
+              qContainer.style.display = "block";
+            };
+            backBar.appendChild(backBtn);
+            vRoot.appendChild(backBar);
+
+            const playerContainer = document.createElement("div");
+            vRoot.appendChild(playerContainer);
+
             window.SherpasVideo.mount({
-              container: vRoot,
+              container: playerContainer,
               story: storyData,
               onAsk: async function (videoQuestionRequestJson) {
                 const askRes = await fetch("/api/video-ask", {
