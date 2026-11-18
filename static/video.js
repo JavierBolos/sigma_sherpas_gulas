@@ -1,6 +1,6 @@
-/* SHERPAS · Interactive Audiovisual Player · Annual Escalation Edition
+/* SHERPAS · Interactive Audiovisual Player · Annual Escalation & Video Edition
 - Public API: window.SherpasVideo.mount({ container, story, onAsk, onSceneChange })
-- Visualizes year-by-year financial escalation as decisions are applied and unlocks the tracker on ending.
+- Visualizes year-by-year financial escalation, scene videos, and unlocks the tracker on ending.
  */
 (function () {
   'use strict';
@@ -90,6 +90,22 @@
     const stage = make('main', 'sv-stage');
     const year = make('div', 'sv-year');
     const symbol = make('div', 'sv-symbol');
+
+    // Scene 16:9 Background/Illustration Video
+    const bgVideo = document.createElement('video');
+    bgVideo.className = 'sv-scene-video';
+    bgVideo.muted = true;
+    bgVideo.loop = true;
+    bgVideo.playsInline = true;
+    bgVideo.autoplay = true;
+    bgVideo.style.cssText = 'width:100%;aspect-ratio:16/9;max-height:280px;object-fit:cover;border-radius:12px;margin:8px auto 14px;display:none;background:#0f172a;';
+
+    // Fallback automatically to emoji symbol if the video file is missing or fails to load
+    bgVideo.addEventListener('error', () => {
+      bgVideo.style.display = 'none';
+      symbol.style.display = 'block';
+    });
+
     const headline = make('h3', 'sv-scene-title');
     const metric = make('div', 'sv-metric');
     const metricLabel = make('div', 'sv-metric-label');
@@ -103,7 +119,7 @@
     const answerText = make('p', 'sv-answer-text');
     const continueAfterAsk = make('button', 'sv-btn sv-answer-next', '↻ Replay this year');
     answerBox.append(answerText, continueAfterAsk);
-    stage.append(year, symbol, headline, metric, narration, source, choices, answerBox);
+    stage.append(year, bgVideo, symbol, headline, metric, narration, source, choices, answerBox);
 
     const controls = make('div', 'sv-controls');
     const back = make('button', 'sv-btn sv-muted', '← Back');
@@ -210,6 +226,22 @@
       questionInput.value = '';
       year.textContent = scene.year === null ? safeText(scene.period_label) : String(scene.year);
       symbol.textContent = visuals[scene.visual_theme];
+
+      // Load scene video if provided, or test default clip in /static/videos/financial_shield.mp4
+      const videoUrl = scene.video_url || '/static/videos/familia_feliz.mp4';
+      if (videoUrl) {
+        if (!bgVideo.src.endsWith(videoUrl)) {
+          bgVideo.src = videoUrl;
+        }
+        bgVideo.style.display = 'block';
+        symbol.style.display = 'none';
+        bgVideo.play().catch(() => {});
+      } else {
+        bgVideo.pause();
+        bgVideo.style.display = 'none';
+        symbol.style.display = 'block';
+      }
+
       headline.textContent = safeText(scene.headline);
       stage.dataset.theme = scene.visual_theme;
       narration.textContent = safeText(scene.narration);
@@ -269,11 +301,13 @@
       if (!paused) {
         paused = true;
         if (audio) audio.pause();
+        bgVideo.pause();
         if ('speechSynthesis' in window) window.speechSynthesis.pause();
         pause.textContent = '▶ Resume';
       } else {
         paused = false;
         if (audio) audio.play().catch(() => {});
+        if (bgVideo.style.display !== 'none') bgVideo.play().catch(() => {});
         if ('speechSynthesis' in window) window.speechSynthesis.resume();
         pause.textContent = '⏸ Pause';
       }
@@ -331,6 +365,7 @@
         destroyed = true;
         stopSpeech();
         stopAnswerAudio();
+        bgVideo.pause();
         container.replaceChildren();
       },
       goToScene(sceneId) { goTo(sceneId, true); },
