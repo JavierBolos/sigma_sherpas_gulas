@@ -1,6 +1,6 @@
-/* SHERPAS · Interactive Audiovisual Player · JSON Contract v1.0
+/* SHERPAS · Interactive Audiovisual Player · Annual Escalation Edition
 - Public API: window.SherpasVideo.mount({ container, story, onAsk, onSceneChange })
-- Does not query MCP or alter the plan: renders the JSON delivered by the backend.
+- Visualizes year-by-year financial escalation as decisions are applied and unlocks the tracker on ending.
  */
 (function () {
   'use strict';
@@ -15,8 +15,8 @@
   const THEMES = new Set(['family_travel', 'dream_home', 'early_retirement', 'financial_shield']);
 
   function validateStory(story) {
-    if (!story || story.schema_version !== '1.0' || !Array.isArray(story.scenes) || story.scenes.length !== 4) {
-      throw new Error('A valid JSON Contract v1.0 story is required.');
+    if (!story || !Array.isArray(story.scenes) || story.scenes.length < 3) {
+      throw new Error('A valid story with at least 3 scenes is required.');
     }
     const sceneMap = new Map();
     for (const scene of story.scenes) {
@@ -41,6 +41,8 @@
     const sceneMap = validateStory(story);
     const askHandler = typeof onAsk === 'function' ? onAsk : null;
     const sceneChangeHandler = typeof onSceneChange === 'function' ? onSceneChange : null;
+    const ladder = Array.isArray(story.escalation_ladder) ? story.escalation_ladder : [];
+
     let currentId = story.start_scene_id;
     let history = [];
     let audio = null;
@@ -56,7 +58,7 @@
     root.setAttribute('aria-label', 'Interactive financial story');
     const device = make('div', 'sv-device');
     const top = make('header', 'sv-header');
-    const eyebrow = make('div', 'sv-eyebrow', 'SHERPAS · YOUR STORY');
+    const eyebrow = make('div', 'sv-eyebrow', 'SHERPAS · ANNUAL ESCALATION PLAN');
     const storyTitle = make('h2', 'sv-story-title', story.title);
     const disclaimer = make('p', 'sv-disclaimer', story.disclaimer);
     const step = make('div', 'sv-step', '');
@@ -67,6 +69,24 @@
     progressTrack.setAttribute('aria-valuemax', String(story.scenes.length));
     const progressFill = make('div', 'sv-progress-fill');
     progressTrack.append(progressFill);
+
+    // Visual Year-by-Year Escalation Strip
+    const ladderStrip = make('div', 'sv-ladder');
+    ladderStrip.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:12px;';
+    const ladderCards = ladder.map((item) => {
+      const card = make('div', 'sv-ladder-step');
+      card.style.cssText = 'padding:8px 10px;border-radius:10px;border:1px solid #cbd5e1;background:#f8fafc;text-align:left;transition:all 0.25s ease;';
+      const yrEl = make('div', '', `📅 ${item.year}`);
+      yrEl.style.cssText = 'font-size:0.75rem;font-weight:800;color:#475569;';
+      const nwEl = make('div', '', item.net_worth_formatted || `Score ${item.projected_score}`);
+      nwEl.style.cssText = 'font-size:0.88rem;font-weight:800;color:#0f172a;margin-top:2px;';
+      const scEl = make('div', '', `Health: ${item.projected_score}/100`);
+      scEl.style.cssText = 'font-size:0.72rem;font-weight:600;color:#2563eb;margin-top:1px;';
+      card.append(yrEl, nwEl, scEl);
+      ladderStrip.append(card);
+      return { stepIndex: item.step_index, el: card, yrEl, nwEl, scEl };
+    });
+
     const stage = make('main', 'sv-stage');
     const year = make('div', 'sv-year');
     const symbol = make('div', 'sv-symbol');
@@ -81,7 +101,7 @@
     const answerBox = make('div', 'sv-answer');
     answerBox.hidden = true;
     const answerText = make('p', 'sv-answer-text');
-    const continueAfterAsk = make('button', 'sv-btn sv-answer-next', '↻ Replay this scene');
+    const continueAfterAsk = make('button', 'sv-btn sv-answer-next', '↻ Replay this year');
     answerBox.append(answerText, continueAfterAsk);
     stage.append(year, symbol, headline, metric, narration, source, choices, answerBox);
 
@@ -92,10 +112,10 @@
     controls.append(back, pause, next);
 
     const questions = make('form', 'sv-qa');
-    const questionLabel = make('label', 'sv-qa-label', 'Any questions about this scene?');
+    const questionLabel = make('label', 'sv-qa-label', 'Questions about this year or decision?');
     const questionInput = make('input', 'sv-qa-input');
     questionInput.type = 'text';
-    questionInput.placeholder = 'e.g., What does this number mean for us?';
+    questionInput.placeholder = 'e.g., How does this decision boost our net worth by this year?';
     questionInput.maxLength = 500;
     questionInput.autocomplete = 'off';
     questionLabel.htmlFor = 'sv-question-' + Math.random().toString(36).slice(2, 8);
@@ -105,6 +125,7 @@
     questions.append(questionLabel, questionInput, ask);
 
     top.append(eyebrow, storyTitle, disclaimer, step, progressTrack);
+    if (ladderCards.length > 0) top.append(ladderStrip);
     device.append(top, stage, controls, questions);
     root.append(device);
     container.append(root);
@@ -115,6 +136,27 @@
       early_retirement: '🌅',
       financial_shield: '🛡️'
     };
+
+    function updateLadderHighlight(activeStep) {
+      for (const item of ladderCards) {
+        if (activeStep > 0 && item.stepIndex === activeStep) {
+          item.el.style.background = '#eff6ff';
+          item.el.style.borderColor = '#2563eb';
+          item.el.style.boxShadow = '0 2px 8px rgba(37, 99, 235, 0.18)';
+          item.yrEl.style.color = '#1d4ed8';
+        } else if (activeStep > 0 && item.stepIndex < activeStep) {
+          item.el.style.background = '#f0fdf4';
+          item.el.style.borderColor = '#86efac';
+          item.el.style.boxShadow = 'none';
+          item.yrEl.style.color = '#15803d';
+        } else {
+          item.el.style.background = '#f8fafc';
+          item.el.style.borderColor = '#cbd5e1';
+          item.el.style.boxShadow = 'none';
+          item.yrEl.style.color = '#475569';
+        }
+      }
+    }
 
     function stopSpeech() {
       playbackId += 1;
@@ -159,8 +201,10 @@
       const currentStep = sceneIndex + 1;
       progressFill.style.width = `${(currentStep / story.scenes.length) * 100}%`;
       progressTrack.setAttribute('aria-valuenow', String(currentStep));
-      progressTrack.setAttribute('aria-valuetext', `Scene ${currentStep} of ${story.scenes.length}`);
-      step.textContent = `SCENE ${currentStep} OF ${story.scenes.length}`;
+      progressTrack.setAttribute('aria-valuetext', `Stage ${currentStep} of ${story.scenes.length}`);
+      step.textContent = `STAGE ${currentStep} OF ${story.scenes.length}`;
+      updateLadderHighlight(Number(scene.escalation_step || 0));
+
       answerBox.hidden = true;
       waitingAnswer = false;
       questionInput.value = '';
@@ -277,7 +321,6 @@
       }
     });
     continueAfterAsk.addEventListener('click', () => {
-      // The paused scene replays from the start; it NEVER skips automatically.
       stopAnswerAudio();
       render();
     });

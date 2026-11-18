@@ -1,418 +1,423 @@
+# story_generator.py
 import os
 import re
 import json
 import base64
-from concurrent.futures import ThreadPoolExecutor
+from datetime import date
+from decimal import Decimal, InvalidOperation
 from openai import OpenAI
 
 
-PRIORITY_LABELS = {
-    "education": "education",
-    "retirement": "retirement",
-    "housing": "housing",
-    "security": "financial security",
-    "debt": "debt reduction",
-    "investments": "investments",
-    "other": "other goals",
+MODEL = "gpt-5-mini"
+
+THEME_KEYWORDS = {
+    "education": ("college", "education", "529", "school", "tuition"),
+    "housing": ("home", "house", "housing", "mortgage", "down payment", "real estate"),
+    "vehicle": ("vehicle", "car", "auto", "credit card", "high-rate", "debt"),
+    "retirement": ("retirement", "retire", "portfolio", "risk", "invested mix", "asset allocation"),
+    "vacation": ("vacation", "travel", "trip", "near-term"),
 }
 
-PRIORITY_THEMES = {
-    "education": "family_travel",
-    "retirement": "early_retirement",
-    "housing": "dream_home",
-    "security": "financial_shield",
-    "debt": "financial_shield",
-    "investments": "early_retirement",
-    "other": "family_travel",
-}
+FINANCIAL_NARRATIVE_KEYS = (
+    "summary_main",
+    "summary_recommendations",
+    "savings_short_observations",
+    "savings_what_to_look_into",
+    "assets_short_observations",
+    "assets_what_to_look_into",
+    "debt_short_observations",
+    "debt_what_to_look_into",
+    "retirement_short_observations",
+    "retirement_what_to_look_into",
+)
 
-PRIORITY_GOAL_TYPES = {
-    "education": {"COLLEGE", "EDUCATION"},
-    "retirement": {"RETIREMENT"},
-    "housing": {"PURCHASE"},
-    "debt": {"DEBT"},
-    "investments": {"INVESTMENT"},
-}
+INVESTMENT_NARRATIVE_KEYS = (
+    "summary_main",
+    "recommendations_main",
+    "portfolio_today_priorities",
+    "portfolio_today_what_it_needs_to_do",
+    "portfolio_today_verdict",
+)
 
-MOVE_LABELS = {
-    "pay down revolving card": "paying down the revolving credit card balance",
-    "add life cover": "expanding life insurance coverage",
-    "raise mortality coverage": "expanding life insurance coverage",
-    "add umbrella cover": "adding umbrella liability coverage",
-    "lower the withdrawal rate": "lowering the annual withdrawal rate",
-    "raise growth allocation toward glide": "adjusting growth asset allocation toward the glide path",
-    "reduce growth allocation toward glide": "adjusting growth asset allocation toward the glide path",
-    "raise annual savings": "increasing annual savings",
-    "close a coverage gap": "closing an insurance coverage gap",
-    "reduce single-name concentration": "reducing single-stock concentration",
-}
-
-ALLOWED_THEMES = {"family_travel", "early_retirement", "dream_home", "financial_shield"}
-PROXY_BASE_URL = "https://llm-hackathon.sherpaswealth.com/v1"
-TTS_MODEL = "eleven-flash-v2.5"
-TTS_VOICE = "alloy"  # Same voice alias as in app.py (/api/video-ask)
+NUMBER_PATTERN = re.compile(r"(?<![\w])(?:[$€£]\s*)?-?\d[\d,]*(?:\.\d+)?(?:\s*%)?")
 
 
-def _format_money(value):
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
-    formatted = f"{value:,.2f}".rstrip("0").rstrip(".")
-    return f"${formatted}"
-
-
-def _year_from_text(value):
-    match = re.search(r"\b(20\d{2})\b", str(value or ""))
-    return int(match.group(1)) if match else None
-
-
-def _join_names(members, case_raw):
-    names = [
-        str(member.get("name", "")).strip()
-        for member in members
-        if isinstance(member, dict) and str(member.get("name", "")).strip()
-    ]
-    if not names:
-        financial = case_raw.get("financial_health_json", {})
-        household = financial.get("case", {}).get("household", [])
-        names = [
-            str(member.get("first_name", "")).strip()
-            for member in household
-            if isinstance(member, dict) and str(member.get("first_name", "")).strip()
-        ]
-    if not names:
-        return "your family"
-    if len(names) == 1:
-        return names[0]
-    return ", ".join(names[:-1]) + " and " + names[-1]
-
-
-def _personal_detail(members):
-    labels = (
-        ("aspirations", "aspiration"),
-        ("concerns", "concern"),
-        ("interests", "interest"),
-        ("non_negotiables", "non-negotiable priority"),
-    )
-    for member in members:
-        if not isinstance(member, dict):
-            continue
-        for field, label in labels:
-            values = member.get(field, [])
-            if isinstance(values, str):
-                values = [values]
-            if values:
-                value = str(values[0]).strip()
-                if value:
-                    name = str(member.get("name", ""))
-                    subject = f"{name} shared" if name else "You shared"
-                    return f"{subject} a key {label}: \"{value[:160]}\"."
-    return ""
-
-
-def _priority_theme(priority):
-    return PRIORITY_THEMES.get(priority, "family_travel")
-
-
-def _goal_for_priorities(goals, priorities):
-    for priority in priorities:
-        goal_types = PRIORITY_GOAL_TYPES.get(priority, set())
-        for goal in goals:
-            if not isinstance(goal, dict):
-                continue
-            goal_type = str(goal.get("goalType", "")).upper()
-            if goal_type in goal_types:
-                if priority != "housing" or goal.get("subType") == "REAL_ESTATE_PURCHASE":
-                    return goal, priority
-    for goal in goals:
-        if isinstance(goal, dict) and (
-            _format_money(goal.get("amount")) or _year_from_text(goal.get("value"))
-        ):
-            goal_type = str(goal.get("goalType", "")).upper()
-            subtype = str(goal.get("subType", "")).upper()
-            if goal_type == "RETIREMENT":
-                return goal, "retirement"
-            if goal_type == "COLLEGE":
-                return goal, "education"
-            if goal_type == "PURCHASE" and subtype == "REAL_ESTATE_PURCHASE":
-                return goal, "housing"
-            return goal, priorities[0] if priorities else "other"
-    return (goals[0], priorities[0] if priorities else "other") if goals else (None, "other")
-
-
-def _describe_goal(goal, priority):
-    if not isinstance(goal, dict):
-        return (
-            "The plan does not specify a dedicated target for this priority, "
-            "so the story keeps the focus on your core financial figures.",
-            "Questionnaire priority",
-            PRIORITY_LABELS.get(priority, "other goals"),
-        )
-
-    goal_type = str(goal.get("goalType", "")).upper()
-    subtype = str(goal.get("subType", "")).upper()
-    amount = _format_money(goal.get("amount"))
-    year = _year_from_text(goal.get("value"))
-    if goal_type == "RETIREMENT":
-        metric_value = str(year) if year else amount
-        if year:
-            narration = f"The plan sets your target retirement year at {year}."
-        elif amount:
-            narration = f"The plan records a retirement target of {amount}."
-        else:
-            narration = "Retirement is included among the core goals in your plan."
-        return narration, "Target retirement year" if year else "Retirement goal", metric_value or "Included in plan"
-
-    if goal_type == "COLLEGE":
-        narration = (
-            f"The plan allocates {amount} toward family education."
-            if amount
-            else "The plan includes an education goal for the family."
-        )
-        if "each child" in str(goal.get("value", "")).lower():
-            narration = f"The plan allocates {amount} for each child's education."
-        return narration, "Education goal", amount or "Included in plan"
-
-    if goal_type == "PURCHASE" and subtype == "REAL_ESTATE_PURCHASE":
-        timing = f" by {year}" if year else ""
-        amount_text = amount or "an unspecified amount"
-        narration = f"The plan includes a home purchase goal of {amount_text}{timing}."
-        return narration, "Housing goal", amount or (str(year) if year else "Included in plan")
-
-    if goal_type == "VACATION":
-        narration = (
-            f"The plan includes a travel goal of {amount}."
-            if amount
-            else "The plan includes a travel goal."
-        )
-        return narration, "Travel goal", amount or "Included in plan"
-
-    if goal_type == "PURCHASE":
-        timing = f" by {year}" if year else ""
-        narration = f"The plan records a purchase goal of {amount}{timing}."
-        return narration, "Purchase goal", amount or (str(year) if year else "Included in plan")
-
-    if amount:
-        return (
-            f"The plan records a {amount} target tied to {PRIORITY_LABELS.get(priority, 'your goals')}.",
-            "Plan goal",
-            amount,
-        )
-    return (
-        "This goal is actively tracked within your family's financial plan.",
-        "Plan goal",
-        str(year) if year else "Included in plan",
-    )
-
-
-def _projection_for_goal(financial, goal):
-    projections = financial.get("projections", {}).get("yearly", [])
-    if not projections:
-        return None
-    goal_year = _year_from_text(goal.get("value")) if isinstance(goal, dict) else None
-    if goal_year:
-        for projection in projections:
-            if projection.get("year") == goal_year:
-                return projection
-    return projections[0]
-
-
-def _describe_move_action(move):
-    title = str(move.get("title", "")).strip().lower()
-    action = str(move.get("action", ""))
-    amount_match = re.search(r"\$[\d,]+(?:\.\d+)?(?:M)?", action)
-    amount = amount_match.group(0) if amount_match else None
-
-    if title == "pay down revolving card" and amount:
-        rate = re.search(r"\d+(?:\.\d+)?%", action)
-        rate_text = f" at {rate.group(0)}" if rate else ""
-        return f"The plan recommends putting {amount} from cash toward the credit card{rate_text}."
-    if title in {"add life cover", "raise mortality coverage"} and amount:
-        return f"The plan recommends increasing life insurance coverage by {amount}."
-    if title == "add umbrella cover" and amount:
-        return f"The plan recommends adding {amount} in umbrella liability coverage."
-    if title == "lower the withdrawal rate" and amount:
-        rate = re.search(r"\d+(?:\.\d+)?%", action)
-        rate_text = f" ({rate.group(0)})" if rate else ""
-        return f"The plan recommends limiting annual withdrawals to {amount}{rate_text}."
-    if title == "raise annual savings" and amount:
-        return f"The plan recommends redirecting {amount} per year into savings."
-    if title in {"raise growth allocation toward glide", "reduce growth allocation toward glide"} and amount:
-        return f"The plan recommends rebalancing your portfolio by roughly {amount}."
-    if title == "reduce single-name concentration" and amount:
-        return f"The plan recommends trimming single-stock concentration by approximately {amount}."
-    if title == "close a coverage gap":
-        return "The plan recommends insuring your primary residence to close a coverage gap."
-    return ""
-
-
-def _generate_tts_b64(client: OpenAI, text: str) -> str:
-    """Generate MP3 audio in Base64 using eleven-flash-v2.5."""
-    clean_text = str(text or "").strip()
-    if not clean_text:
-        return ""
-    try:
-        speech_res = client.audio.speech.create(
-            model=TTS_MODEL,
-            voice=TTS_VOICE,
-            input=clean_text,
-        )
-        return base64.b64encode(speech_res.content).decode("utf-8")
-    except Exception as e:
-        print("[TTS ERROR in story_generator]:", repr(e))
-        return ""
-
-
-def _attach_scene_audios(scenes: list) -> list:
-    """Synthesize all 4 scenes in parallel with eleven-flash-v2.5 and populate audio_b64."""
+def _get_llm_client() -> OpenAI | None:
     team_key = os.environ.get("TEAM_KEY", "").strip()
     if not team_key or "pega_aqui" in team_key:
-        return scenes
-
-    client = OpenAI(
-        base_url=PROXY_BASE_URL,
+        return None
+    return OpenAI(
+        base_url="https://llm-hackathon.sherpaswealth.com/v1",
         api_key=team_key,
-        timeout=25.0,
+        timeout=30.0,
     )
 
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        futures = [
-            executor.submit(_generate_tts_b64, client, scene.get("narration", ""))
-            for scene in scenes
-        ]
-        for scene, future in zip(scenes, futures):
-            scene["audio_b64"] = future.result()
 
-    return scenes
+def _format_money(value) -> str:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return "$0"
+    formatted = f"{abs(value):,.0f}"
+    return f"-${formatted}" if value < 0 else f"${formatted}"
 
 
-def _build_llm_scenes(
-    case_id: str,
-    names: str,
-    profile_data: dict,
-    case_raw: dict,
-    question: str,
-    base_scenes: list,
-    source_ref: str,
-) -> list | None:
-    """Generate a cohesive, conversational 4-act financial story in English using gpt-5-mini."""
-    team_key = os.environ.get("TEAM_KEY", "").strip()
-    if not team_key or "pega_aqui" in team_key:
-        print("[LLM SKIP] TEAM_KEY not configured; using fallback base_scenes.")
+def _parse_year(value) -> int | None:
+    if not isinstance(value, str) or not value.strip():
         return None
-
-    literacy = str(profile_data.get("literacy", "beginner")).strip().lower()
-    tone = str(profile_data.get("tone", "warm")).strip().lower()
-
-    literacy_rules = {
-        "beginner": (
-            "FINANCIAL LITERACY: BEGINNER. Use everyday, jargon-free English. "
-            "Translate every number into what it means for the family's daily peace of mind."
-        ),
-        "intermediate": (
-            "FINANCIAL LITERACY: INTERMEDIATE. Use clear practical concepts such as cash flow, "
-            "liquidity, debt interest, emergency fund, and diversification."
-        ),
-        "advanced": (
-            "FINANCIAL LITERACY: ADVANCED. Use precise financial terminology (opportunity cost, APR, "
-            "glide path allocation, safe withdrawal rate, concentration risk, coverage gap, and nominal dollars) "
-            "while keeping the delivery conversational and natural."
-        ),
-    }.get(literacy, "")
-
-    tone_rules = (
-        "TONE: Direct, crisp, and executive—straight to the point."
-        if tone == "direct"
-        else "TONE: Warm, empathetic, and conversational, like a trusted advisor sitting across the table."
-    )
-
-    fh = case_raw.get("financial_health_json", case_raw)
-    compact_fh = {
-        k: fh[k]
-        for k in ("case", "score", "goals", "projections", "balance_sheet", "cash_flow", "insurance", "recommendations")
-        if isinstance(fh, dict) and k in fh
-    } or fh
-
-    financial_summary = json.dumps(compact_fh, ensure_ascii=False)[:4500]
-    profile_summary = json.dumps(profile_data, ensure_ascii=False)
-
-    system_prompt = (
-        "You are a trusted Sherpas Wealth financial advisor recording a personalized 4-scene voiceover story in English for a family.\n"
-        f"{literacy_rules}\n{tone_rules}\n\n"
-        "RULES FOR A SEAMLESS, NATURAL SPOKEN NARRATIVE:\n"
-        "1. LANGUAGE: Write 100% in natural, fluent English (headlines, narrations, metric labels, and metric values).\n"
-        "2. CONTINUOUS STORY ARC: All 4 scenes form one single continuous monologue. Start scenes 2, 3, and 4 "
-        "with natural conversational transitions linking back to the previous scene (e.g., 'With that baseline clear, "
-        "let's look at what matters most to you...', 'Now, if we project this path forward...', "
-        "'That is why your smartest first move today is...').\n"
-        "3. WRITTEN FOR THE EAR: Speak directly to the family using 'you' and 'your'. Avoid parentheses, slashes "
-        "(say '62 out of 100' instead of '62/100'), bullet points, or markdown. Use ONLY real figures from the JSON plan—never invent numbers.\n"
-        "4. FOUR-ACT STRUCTURE (50-75 words per scene):\n"
-        "   - 'starting_point': Greet the family by name, state where they stand today (health score, core strength, and main blind spot or drag).\n"
-        "   - 'family_priority': Connect their top priority and 'non_negotiables' to their real numbers, and directly answer their questionnaire question.\n"
-        "   - 'plan_projection': Explain their long-term net worth projection and what happens if they stay the course versus fixing weak spots.\n"
-        "   - 'first_step': Highlight the highest-impact move from 'top_moves', how much it raises their score, and the practical benefit.\n\n"
-        "Return ONLY a valid JSON object with the key 'scenes' containing 4 objects with keys: "
-        "'id', 'headline' (max 60 chars), 'narration', 'metric_label', 'metric_value', "
-        "'visual_theme' ('family_travel' | 'early_retirement' | 'dream_home' | 'financial_shield')."
-    )
-
-    user_prompt = (
-        f"FAMILY: {names} ({case_id})\n"
-        f"QUESTIONNAIRE QUESTION: {question or 'Focus on their top stated priorities'}\n"
-        f"PROFILE & PREFERENCES: {profile_summary}\n"
-        f"SHERPAS FINANCIAL PLAN: {financial_summary}"
-    )
-
     try:
-        client = OpenAI(
-            base_url=PROXY_BASE_URL,
-            api_key=team_key,
-            timeout=60.0,
-        )
-        res = client.chat.completions.create(
-            model="gpt-5-mini",
-            reasoning_effort="low",
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-        )
-        raw_content = res.choices[0].message.content.strip()
-        parsed = json.loads(raw_content)
-        ai_scenes = parsed.get("scenes", [])
-        if not isinstance(ai_scenes, list) or len(ai_scenes) < 4:
-            print("[LLM WARN] Incomplete response, using English fallback.")
-            return None
-
-        by_id = {str(s.get("id", "")).strip(): s for s in ai_scenes if isinstance(s, dict)}
-        merged_scenes = []
-        for idx, base in enumerate(base_scenes):
-            ai_item = by_id.get(base["id"]) or (ai_scenes[idx] if idx < len(ai_scenes) else {})
-            headline = str(ai_item.get("headline", "")).strip() or base["headline"]
-            narration = str(ai_item.get("narration", "")).strip() or base["narration"]
-            metric_label = str(ai_item.get("metric_label", "")).strip() or base["metric_badge"]["label"]
-            metric_value = str(ai_item.get("metric_value", "")).strip() or base["metric_badge"]["value"]
-            theme = str(ai_item.get("visual_theme", "")).strip()
-            if theme not in ALLOWED_THEMES:
-                theme = base["visual_theme"]
-
-            merged = dict(base)
-            merged["headline"] = headline
-            merged["narration"] = narration
-            merged["visual_theme"] = theme
-            merged["metric_badge"] = {
-                "label": metric_label,
-                "value": metric_value,
-                "source_ref": source_ref,
-            }
-            merged_scenes.append(merged)
-
-        print("[LLM OK] Continuous English story generated successfully.")
-        return merged_scenes
-    except Exception as e:
-        print("[LLM ERROR in story_generator]:", repr(e))
+        return date.fromisoformat(value.strip()[:10]).year
+    except ValueError:
         return None
+
+
+def _safe_int(value, default: int) -> int:
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        matches = re.findall(r"-?\d+", value)
+        if matches:
+            return int(matches[-1])
+    return default
+
+
+def _split_source_items(text: str) -> list[str]:
+    if not isinstance(text, str) or not text.strip():
+        return []
+    chunks = re.split(r"(?m)(?=^\s*[-*]\s+)", text.strip())
+    items = [re.sub(r"^\s*[-*]\s+", "", c.strip()) for c in chunks if c.strip()]
+    if len(items) == 1 and "\n\n" in items[0]:
+        items = [p.strip() for p in items[0].split("\n\n") if p.strip()]
+    return items
+
+
+def _extract_persona_sections(persona_md: str) -> list[dict]:
+    if not isinstance(persona_md, str) or not persona_md.strip():
+        return []
+    sections = re.split(r"(?m)^##\s+", persona_md)
+    relevant_prefixes = (
+        "D1:",
+        "D2:",
+        "D3:",
+        "D4:",
+        "D5:",
+        "D6:",
+        "Transition alerts",
+        "Subjective concerns",
+        "Objective concerns",
+        "Tensions",
+    )
+    fragments = []
+    total_chars = 0
+    for section in sections[1:]:
+        heading, sep, body = section.partition("\n")
+        heading = heading.strip()
+        body = body.strip()
+        if not sep or not heading or not any(heading.startswith(p) for p in relevant_prefixes):
+            continue
+        excerpt = body[:750]
+        if total_chars + len(excerpt) > 3200:
+            excerpt = excerpt[: max(0, 3200 - total_chars)]
+        if not excerpt:
+            break
+        fragments.append({"source_ref": f"persona.md#{heading}", "text": excerpt})
+        total_chars += len(excerpt)
+    return fragments
+
+
+def _build_yearly_ladder(fh: dict, published_score: int, scale: int, moves: list[dict]) -> list[dict]:
+    """
+    Constructs a chronological year-by-year escalation ladder from projections.yearly
+    and chartGoals, pairing each milestone year with a concrete Sherpas decision.
+    """
+    goals_obj = fh.get("goals", {}) or {}
+    chart_goals = goals_obj.get("chartGoals", []) if isinstance(goals_obj.get("chartGoals"), list) else []
+    goals_summary = goals_obj.get("goalsSummary", []) if isinstance(goals_obj.get("goalsSummary"), list) else []
+    projections_yearly = (
+        (fh.get("projections", {}) or {}).get("yearly", [])
+        if isinstance((fh.get("projections", {}) or {}).get("yearly"), list)
+        else []
+    )
+
+    proj_by_year = {}
+    sorted_proj_rows = []
+    for idx, row in enumerate(projections_yearly):
+        if isinstance(row, dict) and isinstance(row.get("year"), int):
+            entry = {
+                "year": row["year"],
+                "age_client": row.get("age_client"),
+                "net_worth": row.get("net_worth_todays_dollars"),
+                "investable_assets": row.get("investable_assets"),
+                "total_debts": row.get("total_debts"),
+                "source_ref": f"financial-health.json#projections.yearly[{idx}]",
+            }
+            proj_by_year[row["year"]] = entry
+            sorted_proj_rows.append(entry)
+    sorted_proj_rows.sort(key=lambda r: r["year"])
+
+    # Group non-bankruptcy goals by year
+    goals_by_year = {}
+    for idx, g in enumerate(chart_goals):
+        if not isinstance(g, dict):
+            continue
+        g_type = str(g.get("goalType") or "").upper()
+        if "BANKRUPTCY" in g_type:
+            continue
+        yr = _parse_year(g.get("date"))
+        if yr is None:
+            continue
+        matched_amount = None
+        for s in goals_summary:
+            if isinstance(s, dict) and str(s.get("goalType") or "").upper() == g_type:
+                if isinstance(s.get("amount"), (int, float)):
+                    matched_amount = s["amount"]
+                    break
+        goals_by_year.setdefault(yr, []).append({
+            "name": str(g.get("name") or g_type.title()),
+            "goal_type": g_type,
+            "amount": matched_amount,
+            "source_ref": f"financial-health.json#goals.chartGoals[{idx}]",
+        })
+
+    # Choose up to 4 chronological checkpoint years (starting year + milestone years + long-term horizon)
+    candidate_years = sorted(goals_by_year.keys())
+    if sorted_proj_rows:
+        first_yr = sorted_proj_rows[0]["year"]
+        last_yr = sorted_proj_rows[-1]["year"]
+        if first_yr not in candidate_years:
+            candidate_years.insert(0, first_yr)
+        if len(candidate_years) < 3 and len(sorted_proj_rows) >= 3:
+            mid_yr = sorted_proj_rows[len(sorted_proj_rows) // 2]["year"]
+            if mid_yr not in candidate_years:
+                candidate_years.append(mid_yr)
+        if last_yr not in candidate_years and len(candidate_years) < 4:
+            candidate_years.append(last_yr)
+    candidate_years = sorted(dict.fromkeys(candidate_years))[:4]
+
+    if not candidate_years:
+        candidate_years = [2026, 2030, 2035]
+
+    ladder = []
+    for i, yr in enumerate(candidate_years):
+        # Find exact or nearest projection row
+        proj = proj_by_year.get(yr)
+        if proj is None and sorted_proj_rows:
+            proj = min(sorted_proj_rows, key=lambda r: abs(r["year"] - yr))
+
+        yr_goals = goals_by_year.get(yr, [])
+        linked_move = moves[i % len(moves)] if moves else None
+
+        # Progressive score escalation along the timeline
+        step_score = (
+            linked_move["score_after"]
+            if linked_move
+            else min(scale, published_score + (i + 1) * 3)
+        )
+        # Ensure monotonically non-decreasing visual score along years
+        if ladder and step_score < ladder[-1]["projected_score"]:
+            step_score = min(scale, ladder[-1]["projected_score"] + 2)
+
+        nw_val = proj["net_worth"] if proj and isinstance(proj.get("net_worth"), (int, float)) else None
+        inv_val = proj["investable_assets"] if proj and isinstance(proj.get("investable_assets"), (int, float)) else None
+        debt_val = proj["total_debts"] if proj and isinstance(proj.get("total_debts"), (int, float)) else None
+
+        ladder.append({
+            "step_index": i + 1,
+            "year": yr,
+            "age_client": proj.get("age_client") if proj else None,
+            "goals": yr_goals,
+            "goal_names": [g["name"] for g in yr_goals],
+            "decision_title": linked_move["title"] if linked_move else "Stay Consistent With Plan",
+            "decision_detail": linked_move["detail"] if linked_move else "",
+            "projected_score": step_score,
+            "net_worth": nw_val,
+            "net_worth_formatted": _format_money(nw_val) if nw_val is not None else None,
+            "investable_assets": inv_val,
+            "investable_assets_formatted": _format_money(inv_val) if inv_val is not None else None,
+            "total_debts": debt_val,
+            "total_debts_formatted": _format_money(debt_val) if debt_val is not None else None,
+            "source_ref": (
+                yr_goals[0]["source_ref"]
+                if yr_goals
+                else (proj["source_ref"] if proj else "financial-health.json#projections.yearly")
+            ),
+        })
+
+    return ladder
+
+
+def _extract_detailed_evidence(case_raw: dict, priorities: list[str]) -> dict:
+    fh = case_raw.get("financial_health_json", {}) or {}
+    ia = case_raw.get("investment_analysis_json", {}) or {}
+    persona_md = case_raw.get("persona_md", "") or ""
+
+    score_obj = fh.get("score", {}) or {}
+    published_score = _safe_int(score_obj.get("published_score"), 70)
+    scale = _safe_int(score_obj.get("scale"), 100)
+
+    fh_narrative = fh.get("narrative", {}) or {}
+    ia_narrative = ia.get("narrative", {}) or {}
+
+    active_terms = []
+    for p in priorities:
+        active_terms.extend(THEME_KEYWORDS.get(str(p).lower(), (str(p).lower(),)))
+
+    financial_fragments = []
+    for key in FINANCIAL_NARRATIVE_KEYS:
+        raw_val = fh_narrative.get(key, "")
+        items = _split_source_items(raw_val)
+        if not items:
+            continue
+        matched = [
+            it for it in items
+            if any(t in it.lower() for t in active_terms)
+        ] or items[:2]
+        for item in matched[:2]:
+            financial_fragments.append({
+                "source_ref": f"financial-health.json#narrative.{key}",
+                "text": item[:1000],
+            })
+
+    investment_fragments = []
+    for key in INVESTMENT_NARRATIVE_KEYS:
+        raw_val = ia_narrative.get(key, "")
+        items = _split_source_items(raw_val)
+        for item in items[:2]:
+            investment_fragments.append({
+                "source_ref": f"investment-analysis.json#narrative.{key}",
+                "text": item[:1000],
+            })
+
+    persona_fragments = _extract_persona_sections(persona_md)
+
+    top_moves = fh.get("top_moves")
+    if not isinstance(top_moves, list) or not top_moves:
+        top_moves = (score_obj.get("top_moves") if isinstance(score_obj.get("top_moves"), list) else [])
+
+    normalized_moves = []
+    running_score = published_score
+    for idx, mv in enumerate(top_moves[:4]):
+        if isinstance(mv, dict):
+            title = str(mv.get("title") or mv.get("move") or mv.get("name") or f"Action Step {idx + 1}")
+            detail = str(mv.get("description") or mv.get("detail") or mv.get("impact") or "")
+            s_before = _safe_int(mv.get("score_before"), running_score)
+            s_after = _safe_int(mv.get("score_after"), min(scale, s_before + 3))
+            running_score = s_after
+            normalized_moves.append({
+                "id": f"move_{idx + 1}",
+                "title": title,
+                "detail": detail,
+                "score_before": s_before,
+                "score_after": s_after,
+            })
+
+    if not normalized_moves:
+        rec_items = _split_source_items(fh_narrative.get("summary_recommendations", ""))
+        for idx, rec in enumerate(rec_items[:4]):
+            clean_rec = rec.strip().rstrip(".")
+            short_title = clean_rec[:65] + ("..." if len(clean_rec) > 65 else "")
+            s_before = running_score
+            s_after = min(scale, s_before + 3)
+            running_score = s_after
+            normalized_moves.append({
+                "id": f"move_{idx + 1}",
+                "title": short_title,
+                "detail": clean_rec,
+                "score_before": s_before,
+                "score_after": s_after,
+            })
+
+    if len(normalized_moves) < 2 and investment_fragments:
+        inv_text = investment_fragments[0]["text"].strip().rstrip(".")
+        s_before = running_score
+        s_after = min(scale, s_before + 3)
+        normalized_moves.append({
+            "id": f"move_{len(normalized_moves) + 1}",
+            "title": "Align Portfolio Risk & Allocation",
+            "detail": inv_text[:220],
+            "score_before": s_before,
+            "score_after": s_after,
+        })
+
+    yearly_ladder = _build_yearly_ladder(fh, published_score, scale, normalized_moves)
+    best_after_score = max(
+        [m["score_after"] for m in normalized_moves] + [l["projected_score"] for l in yearly_ladder],
+        default=min(scale, published_score + 6),
+    )
+
+    return {
+        "published_score": published_score,
+        "scale": scale,
+        "best_after_score": best_after_score,
+        "yearly_ladder": yearly_ladder,
+        "financial_fragments": financial_fragments,
+        "investment_fragments": investment_fragments,
+        "persona_fragments": persona_fragments,
+        "normalized_moves": normalized_moves,
+        "summary_main": fh_narrative.get("summary_main", ""),
+        "summary_recommendations": fh_narrative.get("summary_recommendations", ""),
+    }
+
+
+def _pick_visual_theme(priorities: list[str]) -> str:
+    joined = " ".join(str(p).lower() for p in priorities)
+    if any(k in joined for k in ("housing", "home", "house", "real_estate")):
+        return "dream_home"
+    if any(k in joined for k in ("retirement", "retire")):
+        return "early_retirement"
+    if any(k in joined for k in ("vacation", "travel")):
+        return "family_travel"
+    return "financial_shield"
+
+
+def _canonical_number(value: str) -> str | None:
+    cleaned = re.sub(r"[$€£%\s]", "", value).replace(",", "")
+    try:
+        return format(Decimal(cleaned).normalize(), "f")
+    except InvalidOperation:
+        return None
+
+
+def _collect_allowed_numbers(evidence: dict) -> set[str]:
+    allowed = set()
+    blob = json.dumps(evidence, ensure_ascii=False)
+    for m in NUMBER_PATTERN.finditer(blob):
+        c = _canonical_number(m.group(0))
+        if c is not None:
+            allowed.add(c)
+    for n in range(1, 15):
+        allowed.add(str(n))
+    return allowed
+
+
+def _sanitize_unverified_numbers(text: str, allowed_numbers: set[str]) -> str:
+    if not allowed_numbers:
+        return text
+
+    def _replace(match):
+        token = match.group(0)
+        canon = _canonical_number(token)
+        if canon in allowed_numbers:
+            return token
+        return ""
+
+    cleaned = NUMBER_PATTERN.sub(_replace, text)
+    return re.sub(r"\s{2,}", " ", cleaned).strip()
+
+
+def _synthesize_tts(llm: OpenAI | None, text: str) -> str:
+    if llm is None or not text.strip():
+        return ""
+    try:
+        speech = llm.audio.speech.create(
+            model="eleven-flash-v2.5",
+            voice="alloy",
+            input=text,
+        )
+        return base64.b64encode(speech.content).decode("utf-8")
+    except Exception as err:
+        print("[TTS ERROR in story_generator]:", repr(err))
+        return ""
 
 
 def build_story_payload(
@@ -422,184 +427,264 @@ def build_story_payload(
     data_status: str,
     question: str = "",
 ) -> dict:
-    """Build four personalized, fact-grounded story scenes in English from a case plan."""
-    financial = case_raw.get("financial_health_json", {})
-    score_data = financial.get("score", {})
-    score = score_data.get("published_score")
-    if score is None:
-        score = score_data.get("value")
-
+    """
+    Builds a chronological year-by-year financial escalation story showing how the family's
+    plan scales across milestone years as they execute Sherpas' recommended decisions.
+    """
     members = profile_data.get("members", [])
-    names = _join_names(members, case_raw)
-    priorities = [
-        str(priority).strip().lower()
-        for priority in profile_data.get("family_priorities", [])
-        if str(priority).strip()
-    ]
-    priority = priorities[0] if priorities else "other"
-    priority_label = PRIORITY_LABELS.get(priority, "other goals")
-    preference_detail = _personal_detail(members)
-    goals = financial.get("goals", {}).get("goalsSummary", [])
-    selected_goal, goal_priority = _goal_for_priorities(goals, priorities)
-    goal_priority_label = PRIORITY_LABELS.get(goal_priority, "other goals")
-    goal_narration, goal_metric_label, goal_metric_value = _describe_goal(selected_goal, goal_priority)
-    theme = _priority_theme(priority)
-    source_ref = f"cases/{case_id}/financial-health.json"
+    names = [m.get("name", "").strip() for m in members if isinstance(m, dict) and m.get("name", "").strip()]
+    family_label = " & ".join(names) if names else case_id.replace("-", " ").title()
+    priorities = profile_data.get("family_priorities", []) or []
+    literacy = profile_data.get("literacy", "intermediate")
+    tone = profile_data.get("tone", "warm")
 
-    score_value = f"{score}/100" if score is not None else "Unavailable"
-    score_spoken = f"{score} out of 100" if score is not None else "no published score yet"
+    evidence = _extract_detailed_evidence(case_raw, priorities)
+    visual_theme = _pick_visual_theme(priorities)
+    allowed_numbers = _collect_allowed_numbers(evidence)
+    moves = evidence["normalized_moves"]
+    ladder = evidence["yearly_ladder"]
 
-    score_narration = (
-        f"Hello {names}, today your plan starts with a financial health score of {score_spoken}. "
-        f"With this snapshot on the table, let's see how it supports your top priority of {priority_label}."
-    )
-    if preference_detail:
-        score_narration += " " + preference_detail
+    first_year = ladder[0]["year"]
+    last_year = ladder[-1]["year"]
 
-    goal_text = (
-        f"Building from that baseline, let's focus on what matters most to you right now: {priority_label}. {goal_narration}"
-    )
-    if question:
-        goal_text += f" Regarding your question about {question[:140]}, we checked how it fits within your actual resources."
+    fallback_texts = {
+        "intro": (
+            f"Today, {family_label} begins with a Sherpas financial health score of "
+            f"{evidence['published_score']} out of {evidence['scale']}. Let's follow your annual plan from "
+            f"{first_year} to {last_year} to see how each smart decision scales your household wealth."
+        ),
+        "choice": (
+            f"Your roadmap spans {len(ladder)} key milestone years from {first_year} to {last_year}. "
+            "Choose whether to follow the year-by-year progression in order or jump ahead to your long-term outcome."
+        ),
+        "ending": (
+            f"By executing these decisions step by step, your health score scales from "
+            f"{evidence['published_score']} toward {evidence['best_after_score']} out of {evidence['scale']}. "
+            "Use your Action Tracker below to check off your first move and schedule a calendar reminder."
+        ),
+    }
 
-    projection = _projection_for_goal(financial, selected_goal)
-    if projection and projection.get("net_worth") is not None:
-        projection_year = projection.get("year", "projected")
-        net_worth = _format_money(projection.get("net_worth"))
-        projection_narration = (
-            f"If we project your current path out to {projection_year}, your plan estimates a net worth of "
-            f"{net_worth}, after accounting for all assets and debts."
+    for item in ladder:
+        idx = item["step_index"]
+        yr = item["year"]
+        nw_phrase = (
+            f"projected net worth reaches {item['net_worth_formatted']} in today's dollars"
+            if item["net_worth_formatted"]
+            else f"your financial health score climbs to {item['projected_score']}"
         )
-        if profile_data.get("literacy") == "advanced":
-            projection_narration += " This figure is expressed in nominal dollars for that target year."
-        projection_metric_label = f"Projected net worth ({projection_year})"
-        projection_metric_value = net_worth
-    else:
-        projection_narration = f"Staying on this trajectory keeps your benchmark indicator at {score_spoken}."
-        projection_metric_label = "Financial health"
-        projection_metric_value = score_value
-
-    moves = score_data.get("top_moves", [])
-    move = moves[0] if moves and isinstance(moves[0], dict) else {}
-    move_title = str(move.get("title", "")).strip()
-    move_label = MOVE_LABELS.get(move_title.lower(), move_title or "following the primary recommendation")
-    score_before = move.get("score_before", score)
-    score_after = move.get("score_after")
-    if score_after is not None:
-        action_metric_value = f"{score_before} → {score_after}/100"
-        action_narration = (
-            f"That is why, if you take one concrete step today, the highest-impact move is {move_label}. "
-            f"With this single adjustment, your score rises from {score_before} to {score_after} out of 100."
+        goal_phrase = (
+            f"supporting {', '.join(item['goal_names'])}"
+            if item["goal_names"]
+            else "strengthening your household balance sheet"
         )
-    else:
-        action_metric_value = score_value
-        action_narration = f"That is why your most effective first step right now is {move_label}."
-    action_detail = _describe_move_action(move)
-    if action_detail:
-        action_narration += " " + action_detail
+        fallback_texts[f"year_{idx}"] = (
+            f"In {yr}, applying the decision to {item['decision_title'].lower()} helps keep your plan scaling, "
+            f"{goal_phrase}. By this stage, {nw_phrase} with a health score of {item['projected_score']}."
+        )
 
-    base_scenes = [
+    llm = _get_llm_client()
+    if llm is not None:
+        ladder_prompt_data = {
+            f"year_{item['step_index']}": {
+                "year": item["year"],
+                "age_client": item["age_client"],
+                "milestones_in_this_year": item["goal_names"],
+                "recommended_decision": item["decision_title"],
+                "decision_rationale": item["decision_detail"],
+                "projected_score": f"{item['projected_score']}/{evidence['scale']}",
+                "net_worth_todays_dollars": item["net_worth_formatted"],
+                "investable_assets": item["investable_assets_formatted"],
+                "total_debts": item["total_debts_formatted"],
+            }
+            for item in ladder
+        }
+
+        prompt_context = {
+            "household": family_label,
+            "members": [
+                {
+                    "name": m.get("name"),
+                    "role": m.get("role"),
+                    "interests": m.get("interests", []),
+                    "aspirations": m.get("aspirations", []),
+                    "concerns": m.get("concerns", []),
+                    "non_negotiables": m.get("non_negotiables", []),
+                }
+                for m in members
+                if isinstance(m, dict)
+            ],
+            "family_priorities": priorities,
+            "literacy_level": literacy,
+            "preferred_tone": tone,
+            "family_question": question,
+            "starting_score": f"{evidence['published_score']}/{evidence['scale']}",
+            "final_projected_score": f"{evidence['best_after_score']}/{evidence['scale']}",
+            "annual_escalation_timeline": ladder_prompt_data,
+            "financial_health_evidence": evidence["financial_fragments"][:6],
+            "investment_analysis_evidence": evidence["investment_fragments"][:5],
+            "persona_context": evidence["persona_fragments"][:5],
+        }
+
+        expected_keys = list(fallback_texts.keys())
+        system_prompt = (
+            "You are a financial educator and storyteller for Sherpas Wealth, not a licensed advisor. "
+            "Guide the family chronologically through their annual financial plan so they clearly see how "
+            "each recommended decision compounds and scales their net worth, assets, debt payoff, and health score over time. "
+            f"Return ONLY a JSON object with these exact keys: {json.dumps(expected_keys)}.\n"
+            "Rules:\n"
+            "- Write in natural, clear, motivating English tailored to literacy_level and preferred_tone.\n"
+            "- Each narration must be 35 to 55 words (2-3 clear spoken sentences). No markdown or bullet points.\n"
+            "- 'intro': Introduce today's baseline score, key strengths, and the core financial tension from persona_context and financial_health_evidence.\n"
+            "- 'choice': Invite the family to walk year-by-year through their scaling roadmap or jump to the final horizon.\n"
+            "- 'year_1', 'year_2', etc.: For each year in annual_escalation_timeline, connect the prior stage to THIS year's recommended_decision, milestones_in_this_year, and exact projected numbers (net worth, investable assets, debt reduction, and score climb). Note that projections are estimates.\n"
+            "- 'ending': Summarize how following the decisions scales their overall score, answer family_question if supported by evidence, and point them to the Action Tracker below.\n"
+            "- Strict grounding: Use ONLY numbers, dollar amounts, and years present in the provided JSON evidence. Never invent figures."
+        )
+
+        try:
+            completion = llm.chat.completions.create(
+                model=MODEL,
+                reasoning_effort="low",
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": json.dumps(prompt_context, ensure_ascii=False)},
+                ],
+            )
+            raw_reply = completion.choices[0].message.content or "{}"
+            parsed = json.loads(raw_reply)
+            for key in expected_keys:
+                candidate = parsed.get(key)
+                if isinstance(candidate, str) and len(candidate.split()) >= 12:
+                    fallback_texts[key] = _sanitize_unverified_numbers(candidate.strip(), allowed_numbers)
+        except Exception as err:
+            print("[LLM ERROR in story_generator]:", repr(err))
+
+    first_year_scene_id = "scene_year_1" if ladder else "scene_ending"
+    last_year_scene_id = f"scene_year_{len(ladder)}" if ladder else "scene_ending"
+
+    scenes = [
         {
-            "id": "starting_point",
-            "kind": "narration",
-            "year": 2026,
-            "period_label": "Today",
-            "visual_theme": theme,
-            "headline": f"{names}: your starting point",
-            "narration": score_narration,
-            "metric_badge": {"label": "Financial health", "value": score_value, "source_ref": source_ref},
-            "source_refs": [source_ref],
-            "next_scene_id": "family_priority",
-            "audio_b64": "",
-        },
-        {
-            "id": "family_priority",
+            "id": "scene_intro",
             "kind": "narration",
             "year": None,
-            "period_label": "Your priority",
-            "visual_theme": _priority_theme(goal_priority),
-            "headline": f"A clear target: {goal_priority_label}",
-            "narration": goal_text,
+            "period_label": "BASELINE · TODAY",
+            "visual_theme": visual_theme,
+            "headline": f"{family_label}: Your Starting Baseline",
+            "narration": fallback_texts["intro"],
             "metric_badge": {
-                "label": goal_metric_label,
-                "value": goal_metric_value,
-                "source_ref": source_ref,
+                "label": "Starting Financial Health Score",
+                "value": f"{evidence['published_score']}/{evidence['scale']}",
+                "source_ref": "financial-health.json#score.published_score",
             },
-            "source_refs": [source_ref],
-            "next_scene_id": "plan_projection",
-            "audio_b64": "",
+            "escalation_step": 0,
+            "next_scene_id": "scene_choice",
+            "choices": [],
+            "audio_b64": _synthesize_tts(llm, fallback_texts["intro"]),
         },
         {
-            "id": "plan_projection",
-            "kind": "narration",
-            "year": projection.get("year") if projection else None,
-            "period_label": "What the plan projects",
-            "visual_theme": "early_retirement" if priority == "retirement" else theme,
-            "headline": "The horizon your numbers point toward",
-            "narration": projection_narration,
+            "id": "scene_choice",
+            "kind": "choice",
+            "year": None,
+            "period_label": f"ANNUAL ROADMAP ({first_year}–{last_year})",
+            "visual_theme": visual_theme,
+            "headline": "How Your Plan Scales Year by Year",
+            "narration": fallback_texts["choice"],
             "metric_badge": {
-                "label": projection_metric_label,
-                "value": projection_metric_value,
-                "source_ref": source_ref,
+                "label": "Projected Score Escalation",
+                "value": f"{evidence['published_score']} → {evidence['best_after_score']}/{evidence['scale']}",
+                "source_ref": "financial-health.json#narrative.summary_recommendations",
             },
-            "source_refs": [source_ref],
-            "next_scene_id": "first_step",
-            "audio_b64": "",
-        },
-        {
-            "id": "first_step",
-            "kind": "ending",
-            "year": 2026,
-            "period_label": "Your first step",
-            "visual_theme": "financial_shield",
-            "headline": "One concrete action from your plan",
-            "narration": action_narration,
-            "metric_badge": {
-                "label": "Score after action",
-                "value": action_metric_value,
-                "source_ref": source_ref,
-            },
-            "source_refs": [source_ref],
+            "escalation_step": 0,
             "next_scene_id": None,
-            "audio_b64": "",
+            "choices": [
+                {
+                    "id": "choice_year_by_year",
+                    "label": f"Follow Year-by-Year Progression ({first_year} → {last_year}) →",
+                    "next_scene_id": first_year_scene_id,
+                },
+                {
+                    "id": "choice_jump_final_year",
+                    "label": f"Jump to {last_year} Horizon →",
+                    "next_scene_id": last_year_scene_id,
+                },
+            ],
+            "audio_b64": _synthesize_tts(llm, fallback_texts["choice"]),
         },
     ]
 
-    llm_scenes = _build_llm_scenes(
-        case_id=case_id,
-        names=names,
-        profile_data=profile_data,
-        case_raw=case_raw,
-        question=question,
-        base_scenes=base_scenes,
-        source_ref=source_ref,
+    for item in ladder:
+        idx = item["step_index"]
+        yr = item["year"]
+        scene_id = f"scene_year_{idx}"
+        next_id = f"scene_year_{idx + 1}" if idx < len(ladder) else "scene_ending"
+
+        badge_label = (
+            f"{yr} Net Worth (Today's $)"
+            if item["net_worth_formatted"]
+            else f"{yr} Projected Health Score"
+        )
+        badge_value = (
+            f"{item['net_worth_formatted']} · Score {item['projected_score']}/{evidence['scale']}"
+            if item["net_worth_formatted"]
+            else f"{item['projected_score']}/{evidence['scale']}"
+        )
+
+        goal_subtitle = f" · {', '.join(item['goal_names'])}" if item["goal_names"] else ""
+        scenes.append(
+            {
+                "id": scene_id,
+                "kind": "narration",
+                "year": yr,
+                "period_label": f"YEAR {yr}{goal_subtitle}".upper(),
+                "visual_theme": visual_theme,
+                "headline": f"{yr}: {item['decision_title']}",
+                "narration": fallback_texts[f"year_{idx}"],
+                "metric_badge": {
+                    "label": badge_label,
+                    "value": badge_value,
+                    "source_ref": item["source_ref"],
+                },
+                "escalation_step": idx,
+                "next_scene_id": next_id,
+                "choices": [],
+                "audio_b64": _synthesize_tts(llm, fallback_texts[f"year_{idx}"]),
+            }
+        )
+
+    scenes.append(
+        {
+            "id": "scene_ending",
+            "kind": "ending",
+            "year": None,
+            "period_label": "ACTION PLAN & REMINDERS",
+            "visual_theme": visual_theme,
+            "headline": f"From {evidence['published_score']} to {evidence['best_after_score']}/{evidence['scale']}: Your Next Moves",
+            "narration": fallback_texts["ending"],
+            "metric_badge": {
+                "label": "Final Projected Health Score",
+                "value": f"{evidence['best_after_score']}/{evidence['scale']} (+{max(0, evidence['best_after_score'] - evidence['published_score'])} pts)",
+                "source_ref": "financial-health.json#score.published_score",
+            },
+            "escalation_step": len(ladder),
+            "next_scene_id": None,
+            "choices": [],
+            "audio_b64": _synthesize_tts(llm, fallback_texts["ending"]),
+        }
     )
-
-    final_scenes = llm_scenes if llm_scenes is not None else base_scenes
-    final_scenes = _attach_scene_audios(final_scenes)
-
-    tracker_moves = []
-    for idx, m in enumerate(moves[:3]):
-        if isinstance(m, dict):
-            raw_t = str(m.get("title", "")).strip()
-            tracker_moves.append({
-                "id": f"move_{idx}",
-                "title": MOVE_LABELS.get(raw_t.lower(), raw_t or "Plan recommendation"),
-                "detail": _describe_move_action(m) or str(m.get("action", "")),
-                "score_before": m.get("score_before", score),
-                "score_after": m.get("score_after", score),
-            })
 
     return {
         "schema_version": "1.0",
         "case_id": case_id,
-        "title": f"Financial Story — {names}",
+        "title": f"{family_label}'s Annual Financial Escalation",
         "data_status": data_status,
-        "disclaimer": "Scenes grounded in the family's actual Sherpas financial plan.",
-        "start_scene_id": "starting_point",
-        "scenes": final_scenes,
+        "disclaimer": "Grounded in your Sherpas annual projections. Future figures are planning estimates, not guarantees.",
+        "start_scene_id": "scene_intro",
+        "scenes": scenes,
+        "escalation_ladder": ladder,
         "tracker": {
-            "base_score": score or 0,
-            "moves": tracker_moves,
+            "base_score": evidence["published_score"],
+            "scale": evidence["scale"],
+            "moves": moves,
         },
     }
