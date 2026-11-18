@@ -8,19 +8,19 @@
     "samantha-lewis"
   ];
 
-  // Nombres iniciales orientativos del caso (editables por el usuario; nunca datos financieros)
+  // Initial illustrative names per household (editable by the user; never financial data)
   const CASE_DEFAULTS = {
     "timothy-melanie-weah": {
-      label: "Timothy y Melanie Weah",
+      label: "Timothy & Melanie Weah",
       members: [
         { name: "Timothy", role: "adult" },
         { name: "Melanie", role: "adult" }
       ],
       contextMembers: ["Timothy", "Melanie", "Liam", "Josh"],
       mainGoals: [
-        "Proteger a la familia y revisar la cobertura ante imprevistos.",
-        "Planificar el ahorro para la educación de sus hijos.",
-        "Priorizar las deudas con intereses altos y organizar el ahorro disponible."
+        "Protect the family and review insurance coverage against unexpected events.",
+        "Plan ahead and build savings for their children's education.",
+        "Prioritize high-interest debt payoff and organize available savings."
       ],
       defaultPriorities: ["education", "retirement"]
     },
@@ -31,23 +31,23 @@
       ],
       contextMembers: ["Michael"],
       mainGoals: [
-        "Preparar la jubilación y sostener sus planes a largo plazo.",
-        "Organizar la compra de vivienda y mantener una reserva para imprevistos.",
-        "Revisar la protección financiera y el flujo de efectivo."
+        "Prepare for retirement and sustain long-term financial plans.",
+        "Organize a home purchase while maintaining an emergency cash reserve.",
+        "Review financial protection and overall cash flow."
       ],
       defaultPriorities: ["housing", "retirement"]
     },
     "daniel-emily-johnson": {
-      label: "Daniel y Emily Johnson",
+      label: "Daniel & Emily Johnson",
       members: [
         { name: "Daniel", role: "adult" },
         { name: "Emily", role: "adult" }
       ],
       contextMembers: ["Daniel", "Emily", "Oliver", "Sophia"],
       mainGoals: [
-        "Fortalecer el plan de jubilación y el ahorro familiar.",
-        "Proteger a la familia ante imprevistos y crear una reserva de efectivo.",
-        "Planificar la educación de sus hijos y reducir las deudas más costosas."
+        "Strengthen their retirement plan and household savings.",
+        "Protect the family against unexpected events and build a cash reserve.",
+        "Plan for their children's education and pay down expensive debt."
       ],
       defaultPriorities: ["debt", "education"]
     },
@@ -58,9 +58,9 @@
       ],
       contextMembers: ["Samantha", "Ethan", "Ava"],
       mainGoals: [
-        "Reforzar el plan de jubilación y mejorar el flujo de efectivo.",
-        "Preparar el ahorro para la educación de sus hijos.",
-        "Revisar la protección de la familia y sus planes de vivienda."
+        "Reinforce her retirement plan and improve monthly cash flow.",
+        "Build dedicated savings for her children's education.",
+        "Review family protection and upcoming housing plans."
       ],
       defaultPriorities: ["education", "housing"]
     }
@@ -69,45 +69,45 @@
   const PRIORITY_OPTIONS = [
     {
       id: "education",
-      label: "Educación de los hijos",
-      help: "Ahorro para estudios y formación, ahora o en el futuro."
+      label: "Children's education",
+      help: "Saving for tuition, college, and education—now or in the future."
     },
     {
       id: "retirement",
-      label: "Jubilación y futuro",
-      help: "Planificación del ahorro y los ingresos para cuando dejéis de trabajar."
+      label: "Retirement & future",
+      help: "Planning savings and income for when you stop working."
     },
     {
       id: "housing",
-      label: "Vivienda",
-      help: "Objetivos relacionados con comprar, alquilar o mantener una vivienda."
+      label: "Housing",
+      help: "Goals related to buying, renting, or maintaining a home."
     },
     {
       id: "security",
-      label: "Seguridad y protección",
-      help: "Protección ante imprevistos que puedan afectar a la familia o sus ingresos."
+      label: "Security & protection",
+      help: "Safeguarding your family and income against unexpected events."
     },
     {
       id: "debt",
-      label: "Reducir deudas",
-      help: "Organizar el pago de préstamos y priorizar los que tienen intereses más altos."
+      label: "Debt reduction",
+      help: "Structuring loan repayments and prioritizing high-interest balances."
     },
     {
       id: "investments",
-      label: "Ahorro e inversión",
-      help: "Ahorrar e invertir con un nivel de riesgo acorde a vuestros objetivos."
+      label: "Savings & investments",
+      help: "Saving and investing at a risk level aligned with your goals."
     },
     {
       id: "other",
-      label: "Otros objetivos",
-      help: "Cualquier otro tema financiero que sea importante para la familia."
+      label: "Other goals",
+      help: "Any other financial topic that matters to your family."
     }
   ];
 
   const ROLE_OPTIONS = [
-    { value: "adult", label: "Adulto/a" },
-    { value: "teen", label: "Adolescente (datos por padres)" },
-    { value: "child", label: "Niño/a (datos por padres)" }
+    { value: "adult", label: "Adult" },
+    { value: "teen", label: "Teenager (entered by parents)" },
+    { value: "child", label: "Child (entered by parents)" }
   ];
 
   function el(tag, className, text) {
@@ -120,7 +120,7 @@
   function appendTooltip(parent, term, description) {
     const tooltip = el("span", "sq-tooltip", "i");
     tooltip.setAttribute("tabindex", "0");
-    tooltip.setAttribute("aria-label", "Información sobre " + term + ": " + description);
+    tooltip.setAttribute("aria-label", "Information about " + term + ": " + description);
     tooltip.setAttribute("title", description);
     tooltip.setAttribute("data-tooltip", description);
     parent.appendChild(tooltip);
@@ -161,22 +161,22 @@
 
   function mount({ container, caseId, onSubmit }) {
     if (!container || !(container instanceof HTMLElement)) {
-      throw new Error("SherpasQuestionnaire.mount requiere un container HTMLElement válido.");
+      throw new Error("SherpasQuestionnaire.mount requires a valid HTMLElement container.");
     }
     if (!ALLOWED_CASES.includes(caseId)) {
-      throw new Error("caseId no válido: " + String(caseId));
+      throw new Error("Invalid caseId: " + String(caseId));
     }
     if (typeof onSubmit !== "function") {
-      throw new Error("SherpasQuestionnaire.mount requiere una función onSubmit.");
+      throw new Error("SherpasQuestionnaire.mount requires an onSubmit function.");
     }
 
-    // Limpiar contenedor para evitar duplicados al cambiar de familia
+    // Clear container to prevent duplicates when switching households
     while (container.firstChild) {
       container.removeChild(container.firstChild);
     }
 
     const preset = CASE_DEFAULTS[caseId];
-   const state = {
+    const state = {
       members: preset.members.map((m) => ({
         name: m.name,
         role: m.role,
@@ -193,23 +193,23 @@
 
     const card = el("div", "sq-card");
 
-    // Cabecera
+    // Header
     const header = el("div", "sq-header");
-    header.appendChild(el("h3", "sq-title", "Personaliza vuestra historia — " + preset.label));
+    header.appendChild(el("h3", "sq-title", "Personalize your story — " + preset.label));
     header.appendChild(
       el(
         "p",
         "sq-subtitle",
-        "No pedimos datos bancarios ni cifras (ya están en vuestro plan de Sherpas). Solo queremos adaptar el relato a lo que más os importa."
+        "We don't ask for bank details or numbers (they are already in your Sherpas plan). We just want to tailor the story to what matters most to you."
       )
     );
     card.appendChild(header);
 
     const caseContext = el("div", "sq-case-context");
-    caseContext.setAttribute("aria-label", "Contexto de " + preset.label);
-    caseContext.appendChild(el("strong", "sq-context-label", "Miembros de la familia"));
+    caseContext.setAttribute("aria-label", "Context for " + preset.label);
+    caseContext.appendChild(el("strong", "sq-context-label", "Household members"));
     caseContext.appendChild(el("p", "sq-context-members", preset.contextMembers.join(", ")));
-    caseContext.appendChild(el("strong", "sq-context-label", "Objetivos principales"));
+    caseContext.appendChild(el("strong", "sq-context-label", "Core goals in plan"));
     const goalsList = el("ul", "sq-context-goals");
     preset.mainGoals.forEach((goal) => {
       goalsList.appendChild(el("li", "", goal));
@@ -218,12 +218,12 @@
     card.appendChild(caseContext);
 
     const progressSection = el("div", "sq-progress-section");
-    const progressLabel = el("span", "sq-progress-label", "Progreso del cuestionario");
+    const progressLabel = el("span", "sq-progress-label", "Questionnaire progress");
     const progress = el("progress", "sq-progress");
     progress.max = 3;
     progress.value = 0;
-    progress.setAttribute("aria-label", "Secciones obligatorias completadas");
-    const progressText = el("span", "sq-progress-text", "0 de 3 secciones completadas");
+    progress.setAttribute("aria-label", "Required sections completed");
+    const progressText = el("span", "sq-progress-text", "0 of 3 sections completed");
     progressSection.appendChild(progressLabel);
     progressSection.appendChild(progress);
     progressSection.appendChild(progressText);
@@ -258,15 +258,15 @@
 
       progress.value = completedSections;
       progress.classList.toggle("is-complete", completedSections === 3);
-      progressText.textContent = completedSections + " de 3 secciones completadas";
+      progressText.textContent = completedSections + " of 3 sections completed";
       progress.setAttribute("aria-valuetext", progressText.textContent);
     }
 
     updateProgress();
 
-    // 1. Sección de miembros
+    // 1. Household members section
     const membersSection = el("div", "sq-section");
-    membersSection.appendChild(el("h4", "sq-section-title", "1. ¿Quién participa en la historia?"));
+    membersSection.appendChild(el("h4", "sq-section-title", "1. Who is part of this story?"));
     const membersListEl = el("div");
     membersSection.appendChild(membersListEl);
 
@@ -281,12 +281,12 @@
         const top = el("div", "sq-member-top");
         const badgeText =
           member.role === "adult"
-            ? "Adulto/a #" + (idx + 1)
-            : "Hijo/a (información opcional de padres)";
+            ? "Adult #" + (idx + 1)
+            : "Child (optional details entered by parents)";
         top.appendChild(el("strong", "", badgeText));
 
         if (state.members.length > 1) {
-          const removeBtn = el("button", "sq-btn sq-btn-danger", "Quitar");
+          const removeBtn = el("button", "sq-btn sq-btn-danger", "Remove");
           removeBtn.type = "button";
           removeBtn.addEventListener("click", () => {
             state.members.splice(idx, 1);
@@ -299,13 +299,13 @@
 
         const grid = el("div", "sq-grid");
 
-        // Nombre
+        // Name
         const nameField = el("div", "sq-field");
-        nameField.appendChild(el("label", "", "¿Cómo quieres que te llamemos? *"));
+        nameField.appendChild(el("label", "", "First name *"));
         const nameInput = el("input", "sq-input");
         nameInput.type = "text";
         nameInput.maxLength = 100;
-        nameInput.placeholder = "Ej: Timothy";
+        nameInput.placeholder = "e.g., Timothy";
         nameInput.value = member.name;
         nameInput.addEventListener("input", (e) => {
           state.members[idx].name = e.target.value;
@@ -314,9 +314,9 @@
         nameField.appendChild(nameInput);
         grid.appendChild(nameField);
 
-        // Rol
+        // Role
         const roleField = el("div", "sq-field");
-        roleField.appendChild(el("label", "", "Perfil en la familia"));
+        roleField.appendChild(el("label", "", "Household role"));
         const roleSelect = el("select", "sq-select");
         ROLE_OPTIONS.forEach((opt) => {
           const o = el("option", "", opt.label);
@@ -332,20 +332,20 @@
         roleField.appendChild(roleSelect);
         grid.appendChild(roleField);
 
-        // Preocupaciones
+        // Concerns
         const concernsField = el("div", "sq-field");
         concernsField.appendChild(
           el(
             "label",
             "",
             member.role === "adult"
-              ? "¿Qué te preocupa más del futuro?"
-              : "¿Qué objetivo os preocupa para él/ella? (opcional)"
+              ? "What worries you most about the future?"
+              : "What goal or concern do you have for them? (optional)"
           )
         );
         const concernsInput = el("input", "sq-input");
         concernsInput.type = "text";
-        concernsInput.placeholder = "Ej: universidad, jubilación, imprevistos";
+        concernsInput.placeholder = "e.g., college tuition, retirement, emergencies";
         concernsInput.value = member.concerns;
         concernsInput.addEventListener("input", (e) => {
           state.members[idx].concerns = e.target.value;
@@ -353,20 +353,20 @@
         concernsField.appendChild(concernsInput);
         grid.appendChild(concernsField);
 
-        // Aspiraciones
+        // Aspirations
         const aspField = el("div", "sq-field");
         aspField.appendChild(
           el(
             "label",
             "",
             member.role === "adult"
-              ? "¿Qué ilusión o meta te gustaría alcanzar?"
-              : "¿Qué sueña estudiar o lograr? (opcional)"
+              ? "What dream or milestone would you love to achieve?"
+              : "What do they dream of studying or achieving? (optional)"
           )
         );
         const aspInput = el("input", "sq-input");
         aspInput.type = "text";
-        aspInput.placeholder = "Ej: más tiempo libre, tranquilidad";
+        aspInput.placeholder = "e.g., more free time, peace of mind";
         aspInput.value = member.aspirations;
         aspInput.addEventListener("input", (e) => {
           state.members[idx].aspirations = e.target.value;
@@ -374,12 +374,12 @@
         aspField.appendChild(aspInput);
         grid.appendChild(aspField);
 
-        // No negociables
+        // Non-negotiables
         const nonNegField = el("div", "sq-field");
-        nonNegField.appendChild(el("label", "", "¿Qué no querrías sacrificar? (opcional)"));
+        nonNegField.appendChild(el("label", "", "What wouldn't you want to sacrifice? (optional)"));
         const nonNegInput = el("input", "sq-input");
         nonNegInput.type = "text";
-        nonNegInput.placeholder = "Ej: vacaciones en familia, deporte";
+        nonNegInput.placeholder = "e.g., annual family trips, sports";
         nonNegInput.value = member.non_negotiables;
         nonNegInput.addEventListener("input", (e) => {
           state.members[idx].non_negotiables = e.target.value;
@@ -387,12 +387,12 @@
         nonNegField.appendChild(nonNegInput);
         grid.appendChild(nonNegField);
 
-        // Intereses / Hobbies
+        // Interests / Hobbies
         const intField = el("div", "sq-field");
-        intField.appendChild(el("label", "", "Aficiones o tiempo libre (opcional)"));
+        intField.appendChild(el("label", "", "Hobbies or free-time interests (optional)"));
         const intInput = el("input", "sq-input");
         intInput.type = "text";
-        intInput.placeholder = "Ej: lectura, senderismo, música";
+        intInput.placeholder = "e.g., reading, hiking, music";
         intInput.value = member.interests;
         intInput.addEventListener("input", (e) => {
           state.members[idx].interests = e.target.value;
@@ -402,7 +402,7 @@
 
         mCard.appendChild(grid);
         mCard.appendChild(
-          el("div", "sq-hint", "Puedes separar varias respuestas con comas (máx. 5 por campo).")
+          el("div", "sq-hint", "You can separate multiple entries with commas (max. 5 per field).")
         );
         membersListEl.appendChild(mCard);
       });
@@ -411,7 +411,7 @@
     renderMembers();
 
     const memberActions = el("div", "sq-btn-row");
-    const addAdultBtn = el("button", "sq-btn", "+ Añadir otro adulto");
+    const addAdultBtn = el("button", "sq-btn", "+ Add another adult");
     addAdultBtn.type = "button";
     addAdultBtn.addEventListener("click", () => {
       if (state.members.length >= 8) return;
@@ -427,7 +427,7 @@
       updateProgress();
     });
 
-    const addChildBtn = el("button", "sq-btn", "+ Añadir hijo/a (opcional)");
+    const addChildBtn = el("button", "sq-btn", "+ Add child (optional)");
     addChildBtn.type = "button";
     addChildBtn.addEventListener("click", () => {
       if (state.members.length >= 8) return;
@@ -448,10 +448,10 @@
     membersSection.appendChild(memberActions);
     card.appendChild(membersSection);
 
-    // 2. Prioridades familiares ordenadas (1 a 3)
+    // 2. Ranked family priorities (1 to 3)
     const prioSection = el("div", "sq-section");
     prioSection.appendChild(
-      el("h4", "sq-section-title", "2. ¿Qué temas queréis priorizar en el vídeo? (elige 1 a 3 en orden)")
+      el("h4", "sq-section-title", "2. Which topics should the video prioritize? (pick 1 to 3 in order)")
     );
     const prioWrap = el("div", "sq-priorities-wrap");
     const chipsContainer = el("div", "sq-priority-chips");
@@ -477,7 +477,7 @@
             state.family_priorities.splice(pos, 1);
           } else {
             if (state.family_priorities.length >= 3) {
-              showError("Puedes seleccionar un máximo de 3 prioridades familiares.");
+              showError("You can select a maximum of 3 family priorities.");
               return;
             }
             state.family_priorities.push(opt.id);
@@ -487,7 +487,7 @@
         });
         if (opt.help) {
           chip.setAttribute("title", opt.help);
-          chip.setAttribute("aria-label", opt.label + ". Información: " + opt.help);
+          chip.setAttribute("aria-label", opt.label + ". Info: " + opt.help);
           chip.setAttribute("data-tooltip", opt.help);
         }
         chipsContainer.appendChild(chip);
@@ -495,13 +495,13 @@
 
       state.family_priorities.forEach((prioId, index) => {
         const row = el("div", "sq-ordered-item");
-        row.appendChild(el("span", "", (index + 1) + "º · " + getPriorityLabel(prioId)));
+        row.appendChild(el("span", "", "#" + (index + 1) + " · " + getPriorityLabel(prioId)));
 
         const actions = el("div", "sq-order-actions");
         if (index > 0) {
           const upBtn = el("button", "sq-order-btn", "↑");
           upBtn.type = "button";
-          upBtn.title = "Subir prioridad";
+          upBtn.title = "Move priority up";
           upBtn.addEventListener("click", () => {
             const tmp = state.family_priorities[index - 1];
             state.family_priorities[index - 1] = state.family_priorities[index];
@@ -513,7 +513,7 @@
         if (index < state.family_priorities.length - 1) {
           const downBtn = el("button", "sq-order-btn", "↓");
           downBtn.type = "button";
-          downBtn.title = "Bajar prioridad";
+          downBtn.title = "Move priority down";
           downBtn.addEventListener("click", () => {
             const tmp = state.family_priorities[index + 1];
             state.family_priorities[index + 1] = state.family_priorities[index];
@@ -533,25 +533,25 @@
     prioSection.appendChild(prioWrap);
     card.appendChild(prioSection);
 
-    // 3. Estilo de explicación y pregunta inicial
+    // 3. Narration style and main question
     const styleSection = el("div", "sq-section");
-    styleSection.appendChild(el("h4", "sq-section-title", "3. ¿Cómo preferís que os lo contemos?"));
+    styleSection.appendChild(el("h4", "sq-section-title", "3. How would you like us to explain it?"));
     const styleGrid = el("div", "sq-grid");
 
-    // Nivel financiero
+    // Financial literacy
     const litField = el("div", "sq-field");
-    const litLabel = el("label", "", "Nivel de detalle financiero");
+    const litLabel = el("label", "", "Financial detail level");
     appendTooltip(
       litLabel,
-      "nivel de detalle financiero",
-      "Indica cuántos términos y explicaciones financieras queréis incluir en la narración."
+      "financial detail level",
+      "Controls how many financial terms and technical explanations are included in the narration."
     );
     litField.appendChild(litLabel);
     const litSelect = el("select", "sq-select");
     [
-      { value: "beginner", label: "Sencillo y sin tecnicismos" },
-      { value: "intermediate", label: "Equilibrado, con algún detalle" },
-      { value: "advanced", label: "Más técnico y detallado" }
+      { value: "beginner", label: "Simple & jargon-free" },
+      { value: "intermediate", label: "Balanced, with key details" },
+      { value: "advanced", label: "More technical & detailed" }
     ].forEach((opt) => {
       const o = el("option", "", opt.label);
       o.value = opt.value;
@@ -564,13 +564,13 @@
     litField.appendChild(litSelect);
     styleGrid.appendChild(litField);
 
-    // Tono
+    // Tone
     const toneField = el("div", "sq-field");
-    toneField.appendChild(el("label", "", "Tono de la narración"));
+    toneField.appendChild(el("label", "", "Narration tone"));
     const toneSelect = el("select", "sq-select");
     [
-      { value: "warm", label: "Cercano y familiar" },
-      { value: "direct", label: "Directo y al grano" }
+      { value: "warm", label: "Warm & conversational" },
+      { value: "direct", label: "Direct & to the point" }
     ].forEach((opt) => {
       const o = el("option", "", opt.label);
       o.value = opt.value;
@@ -585,15 +585,14 @@
 
     styleSection.appendChild(styleGrid);
 
-    // Pregunta / motivo general
-  // Pregunta / motivo general
+    // Main question
     const qField = el("div", "sq-field");
     qField.style.marginTop = "0.65rem";
-    qField.appendChild(el("label", "", "¿Qué os gustaría entender hoy de vuestro plan? *"));
+    qField.appendChild(el("label", "", "What would you like to understand about your plan today? *"));
     const qInput = el("input", "sq-input");
     qInput.type = "text";
     qInput.maxLength = 500;
-    qInput.placeholder = "Ej: ¿Podemos permitirnos viajar cada año sin retrasar la jubilación?";
+    qInput.placeholder = "e.g., Can we afford annual family trips without delaying retirement?";
     qInput.value = state.question;
     qInput.addEventListener("input", (e) => {
       state.question = e.target.value;
@@ -601,11 +600,11 @@
     });
     qField.appendChild(qInput);
 
-    // Preguntas rápidas clicables
+    // Clickable quick-fill questions
     const suggestedQuestions = [
-      "¿Llegamos cómodos a la jubilación manteniendo nuestro nivel de vida?",
-      "¿Cómo afecta comprar una segunda vivienda a nuestros ahorros?",
-      "¿Qué pasa con el plan si uno de los dos deja de trabajar 2 años?"
+      "Are we on track for a comfortable retirement while maintaining our lifestyle?",
+      "How would buying a second home impact our long-term savings?",
+      "What happens to our plan if one of us takes 2 years off work?"
     ];
     const suggestionsBox = el("div", "sq-question-suggestions");
     suggestedQuestions.forEach((text) => {
@@ -621,11 +620,10 @@
     qField.appendChild(suggestionsBox);
 
     styleSection.appendChild(qField);
-    styleSection.appendChild(qField);
-
     card.appendChild(styleSection);
-    // Botón enviar
-    const submitBtn = el("button", "sq-btn-primary", "Generar nuestra historia personalizada");
+
+    // Submit button
+    const submitBtn = el("button", "sq-btn-primary", "Generate our personalized story");
     submitBtn.type = "button";
 
     const submitStatus = el("div", "sq-submit-status");
@@ -635,14 +633,14 @@
     const spinner = el("span", "sq-spinner");
     spinner.setAttribute("aria-hidden", "true");
     submitStatus.appendChild(spinner);
-    submitStatus.appendChild(el("span", "", "Enviando el cuestionario y preparando vuestra historia..."));
+    submitStatus.appendChild(el("span", "", "Submitting questionnaire and preparing your story..."));
 
     submitBtn.addEventListener("click", async () => {
       showError("");
 
-      // Validaciones acordes a contracts/questionnaire.schema.json
+      // Validations aligned with contracts/questionnaire.schema.json
       if (state.members.length < 1 || state.members.length > 8) {
-        showError("Debe haber entre 1 y 8 participantes.");
+        showError("There must be between 1 and 8 household participants.");
         return;
       }
 
@@ -653,7 +651,7 @@
         const m = state.members[i];
         const cleanName = String(m.name || "").trim().slice(0, 100);
         if (!cleanName) {
-          showError("Por favor, indica un nombre para todos los participantes añadidos.");
+          showError("Please enter a first name for all added participants.");
           return;
         }
         formattedMembers.push({
@@ -668,13 +666,13 @@
       }
 
       if (state.family_priorities.length < 1 || state.family_priorities.length > 3) {
-        showError("Selecciona entre 1 y 3 prioridades familiares.");
+        showError("Please select between 1 and 3 family priorities.");
         return;
       }
 
       const cleanQuestion = String(state.question || "").trim().slice(0, 500);
       if (!cleanQuestion) {
-        showError("Escribe brevemente qué os gustaría entender de vuestro plan.");
+        showError("Please briefly write what you would like to understand about your plan.");
         return;
       }
 
@@ -692,16 +690,16 @@
 
       submitBtn.disabled = true;
       submitBtn.setAttribute("aria-busy", "true");
-      submitBtn.textContent = "Preparando historia...";
+      submitBtn.textContent = "Preparing story...";
       submitStatus.hidden = false;
       try {
         await onSubmit(payload);
       } catch (err) {
-        showError("Error al enviar el cuestionario: " + (err && err.message ? err.message : String(err)));
+        showError("Error submitting questionnaire: " + (err && err.message ? err.message : String(err)));
       } finally {
         submitBtn.disabled = false;
         submitBtn.removeAttribute("aria-busy");
-        submitBtn.textContent = "Generar nuestra historia personalizada";
+        submitBtn.textContent = "Generate our personalized story";
         submitStatus.hidden = true;
       }
     });

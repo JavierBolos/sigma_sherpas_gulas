@@ -64,7 +64,7 @@ class VideoQuestionRequest(BaseModel):
 def get_llm_client() -> OpenAI:
     team_key = os.environ.get("TEAM_KEY", "").strip()
     return OpenAI(
-        base_url="https://llm-hackathon.sherpaswealth.com",
+        base_url="https://llm-hackathon.sherpaswealth.com/v1",
         api_key=team_key,
         timeout=30.0
     )
@@ -76,16 +76,16 @@ def home():
 @app.post("/api/story")
 async def create_story(req: StoryRequest):
     """
-    Endpoint principal exigido por el contrato.
-    Recibe el cuestionario y devuelve las escenas en JSON.
+    Main endpoint required by the contract.
+    Receives the questionnaire and returns the story scenes in JSON.
     """
     if req.case_id not in ["timothy-melanie-weah", "michael-carter", "daniel-emily-johnson", "samantha-lewis"]:
-        raise HTTPException(status_code=400, detail=f"case_id '{req.case_id}' no es válido")
+        raise HTTPException(status_code=400, detail=f"Invalid case_id '{req.case_id}'")
 
-    # 1. Obtener datos (MCP en vivo o fallback local)
+    # 1. Fetch data (live MCP or local fallback)
     case_data, data_status = await get_case_data(req.case_id)
 
-    # 2. Construir la respuesta estructurada pasando también la pregunta del usuario
+    # 2. Build the structured story payload including the user's question
     try:
         payload = build_story_payload(
             case_id=req.case_id,
@@ -107,28 +107,31 @@ async def create_story(req: StoryRequest):
 @app.post("/api/video-ask")
 async def ask_during_video(req: VideoQuestionRequest):
     """
-    Responde a dudas en tiempo real durante la reproducción del vídeo.
+    Answers live questions in English while the user pauses the interactive video.
     """
     team_key = os.environ.get("TEAM_KEY", "").strip()
     
-    # Si no hay clave configurada o estamos probando sin saldo
+    # Fallback when TEAM_KEY is missing
     if not team_key or "pega_aqui" in team_key:
         answer = (
-            f"Sobre '{req.scene_title}': esa cifra ({req.scene_metric}) proviene de "
-            "vuestro plan financiero de Sherpas para optimizar el ahorro sin perder liquidez."
+            f"Regarding '{req.scene_title}': that figure ({req.scene_metric}) comes directly from "
+            "your Sherpas financial plan to optimize savings while protecting liquidity."
         )
         return {"answer": answer, "audio_b64": ""}
 
     try:
         llm = get_llm_client()
         system_prompt = (
-            "El usuario está viendo un vídeo explicativo sobre su plan financiero y lo ha pausado para hacer una duda en directo. "
-            "Responde en máximo 3 frases, de forma clara, empática y cercana.\n\n"
-            f"ESCENA ACTUAL:\n- Título: {req.scene_title}\n- Cifra: {req.scene_metric}\n- Explicación: {req.scene_narration}"
+            "You are Sherpas Wealth's trusted financial advisor. The user is watching their personalized "
+            "financial story video and paused to ask a live question. Answer in natural, fluent English "
+            "in 2 or 3 clear, warm, conversational sentences (under 55 words), grounded strictly in the "
+            "current scene context. Do not use markdown, parentheses, or bullet points.\n\n"
+            f"CURRENT SCENE:\n- Title: {req.scene_title}\n- Metric: {req.scene_metric}\n- Narration: {req.scene_narration}"
         )
 
         res = llm.chat.completions.create(
             model="gpt-5-mini",
+            reasoning_effort="low",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": req.question}
@@ -136,7 +139,7 @@ async def ask_during_video(req: VideoQuestionRequest):
         )
         answer = res.choices[0].message.content.strip()
 
-        # --- Generación de audio TTS con ElevenLabs (Base64) ---
+        # --- TTS generation with ElevenLabs (Base64) ---
         audio_b64 = ""
         try:
             speech_res = llm.audio.speech.create(
@@ -145,13 +148,78 @@ async def ask_during_video(req: VideoQuestionRequest):
                 input=answer
             )
             audio_b64 = base64.b64encode(speech_res.content).decode("utf-8")
-        except Exception:
+        except Exception as tts_err:
+            print("[TTS ERROR en /api/video-ask]:", repr(tts_err))
             audio_b64 = ""
 
         return {"answer": answer, "audio_b64": audio_b64}
 
+    except Exception as err:
+        print("[LLM ERROR en /api/video-ask]:", repr(err))
+        return {"answer": f"Based on your Sherpas plan data: {req.scene_metric}", "audio_b64": ""}
+
+class CheckinRequest(BaseModel):
+    case_id: str
+    completed_moves: List[str] = []
+    pending_moves: List[str] = []
+    current_score: int = 0
+    projected_score: int = 0
+    user_note: str = ""
+
+@app.post("/api/checkin")
+async def family_checkin(req: CheckinRequest):
+    """
+    Evaluates family progress on their recommended top_moves and gives spoken feedback.
+    """
+    team_key = os.environ.get("TEAM_KEY", "").strip()
+    if not team_key or "pega_aqui" in team_key:
+        answer = (
+            f"Great progress! Completing {len(req.completed_moves)} action(s) brings your "
+            f"projected financial health score from {req.current_score} to {req.projected_score} out of 100."
+        )
+        return {"feedback": answer, "audio_b64": ""}
+
+    try:
+        llm = get_llm_client()
+        system_prompt = (
+            "You are Sherpas Wealth's financial coach doing a quick progress check-in with a family. "
+            "Respond in natural, encouraging English in 2 short sentences (under 45 words), referencing "
+            "their completed moves, updated score, and the single most important next action. No markdown."
+        )
+        user_msg = (
+            f"Household: {req.case_id}\n"
+            f"Completed actions: {req.completed_moves}\n"
+            f"Pending actions: {req.pending_moves}\n"
+            f"Score: {req.current_score} -> {req.projected_score}/100\n"
+            f"Family update note: {req.user_note or 'Routine check-in'}"
+        )
+        res = llm.chat.completions.create(
+            model="gpt-5-mini",
+            reasoning_effort="low",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_msg},
+            ],
+        )
+        feedback = res.choices[0].message.content.strip()
+
+        audio_b64 = ""
+        try:
+            speech_res = llm.audio.speech.create(
+                model="eleven-flash-v2.5",
+                voice="alloy",
+                input=feedback,
+            )
+            audio_b64 = base64.b64encode(speech_res.content).decode("utf-8")
+        except Exception:
+            audio_b64 = ""
+
+        return {"feedback": feedback, "audio_b64": audio_b64}
     except Exception:
-        return {"answer": f"Respuesta basada en datos de Sherpas: {req.scene_metric}", "audio_b64": ""}
+        return {
+            "feedback": f"You are on track: your score rises to {req.projected_score} out of 100.",
+            "audio_b64": "",
+        }
 
 
 if __name__ == "__main__":

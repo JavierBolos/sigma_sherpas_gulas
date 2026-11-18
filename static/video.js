@@ -1,6 +1,6 @@
-/* SHERPAS · Reproductor audiovisual interactivo · Contrato JSON v1.0
- * API pública: window.SherpasVideo.mount({ container, story, onAsk })
- * No consulta MCP ni modifica el plan: muestra el JSON entregado por el backend.
+/* SHERPAS · Interactive Audiovisual Player · JSON Contract v1.0
+- Public API: window.SherpasVideo.mount({ container, story, onAsk, onSceneChange })
+- Does not query MCP or alter the plan: renders the JSON delivered by the backend.
  */
 (function () {
   'use strict';
@@ -16,30 +16,31 @@
 
   function validateStory(story) {
     if (!story || story.schema_version !== '1.0' || !Array.isArray(story.scenes) || story.scenes.length !== 4) {
-      throw new Error('Se necesita una historia válida del contrato JSON v1.0.');
+      throw new Error('A valid JSON Contract v1.0 story is required.');
     }
     const sceneMap = new Map();
     for (const scene of story.scenes) {
-      if (!scene.id || sceneMap.has(scene.id)) throw new Error('Hay escenas sin identificador o duplicadas.');
+      if (!scene.id || sceneMap.has(scene.id)) throw new Error('Scenes have missing or duplicate IDs.');
       if (!THEMES.has(scene.visual_theme) || !scene.headline || !scene.narration || !scene.metric_badge) {
-        throw new Error('Cada escena debe incluir tema, titular, narración e indicador.');
+        throw new Error('Each scene must include theme, headline, narration, and metric badge.');
       }
       sceneMap.set(scene.id, scene);
     }
-    if (!sceneMap.has(story.start_scene_id)) throw new Error('No existe la escena inicial.');
+    if (!sceneMap.has(story.start_scene_id)) throw new Error('Start scene does not exist.');
     for (const scene of story.scenes) {
-      if (scene.next_scene_id && !sceneMap.has(scene.next_scene_id)) throw new Error(`Escena inexistente: ${scene.next_scene_id}`);
+      if (scene.next_scene_id && !sceneMap.has(scene.next_scene_id)) throw new Error(`Missing next scene: ${scene.next_scene_id}`);
       for (const choice of (scene.choices || [])) {
-        if (!sceneMap.has(choice.next_scene_id)) throw new Error(`Ruta inexistente: ${choice.next_scene_id}`);
+        if (!sceneMap.has(choice.next_scene_id)) throw new Error(`Missing choice route: ${choice.next_scene_id}`);
       }
     }
     return sceneMap;
   }
 
-  function mount({ container, story, onAsk } = {}) {
-    if (!(container instanceof HTMLElement)) throw new Error('container debe ser un elemento HTML.');
+  function mount({ container, story, onAsk, onSceneChange } = {}) {
+    if (!(container instanceof HTMLElement)) throw new Error('container must be a valid HTML element.');
     const sceneMap = validateStory(story);
     const askHandler = typeof onAsk === 'function' ? onAsk : null;
+    const sceneChangeHandler = typeof onSceneChange === 'function' ? onSceneChange : null;
     let currentId = story.start_scene_id;
     let history = [];
     let audio = null;
@@ -52,16 +53,16 @@
 
     container.replaceChildren();
     const root = make('section', 'sv-root');
-    root.setAttribute('aria-label', 'Historia financiera interactiva');
+    root.setAttribute('aria-label', 'Interactive financial story');
     const device = make('div', 'sv-device');
     const top = make('header', 'sv-header');
-    const eyebrow = make('div', 'sv-eyebrow', 'SHERPAS · TU HISTORIA');
+    const eyebrow = make('div', 'sv-eyebrow', 'SHERPAS · YOUR STORY');
     const storyTitle = make('h2', 'sv-story-title', story.title);
     const disclaimer = make('p', 'sv-disclaimer', story.disclaimer);
     const step = make('div', 'sv-step', '');
     const progressTrack = make('div', 'sv-progress-track');
     progressTrack.setAttribute('role', 'progressbar');
-    progressTrack.setAttribute('aria-label', 'Progreso de la historia');
+    progressTrack.setAttribute('aria-label', 'Story progress');
     progressTrack.setAttribute('aria-valuemin', '1');
     progressTrack.setAttribute('aria-valuemax', String(story.scenes.length));
     const progressFill = make('div', 'sv-progress-fill');
@@ -80,26 +81,26 @@
     const answerBox = make('div', 'sv-answer');
     answerBox.hidden = true;
     const answerText = make('p', 'sv-answer-text');
-    const continueAfterAsk = make('button', 'sv-btn sv-answer-next', '↻ Volver a escuchar esta escena');
+    const continueAfterAsk = make('button', 'sv-btn sv-answer-next', '↻ Replay this scene');
     answerBox.append(answerText, continueAfterAsk);
     stage.append(year, symbol, headline, metric, narration, source, choices, answerBox);
 
     const controls = make('div', 'sv-controls');
-    const back = make('button', 'sv-btn sv-muted', '← Atrás');
-    const pause = make('button', 'sv-btn sv-muted', '⏸ Pausar');
-    const next = make('button', 'sv-btn sv-primary', 'Siguiente →');
+    const back = make('button', 'sv-btn sv-muted', '← Back');
+    const pause = make('button', 'sv-btn sv-muted', '⏸ Pause');
+    const next = make('button', 'sv-btn sv-primary', 'Next →');
     controls.append(back, pause, next);
 
     const questions = make('form', 'sv-qa');
-    const questionLabel = make('label', 'sv-qa-label', '¿Alguna duda sobre esta escena?');
+    const questionLabel = make('label', 'sv-qa-label', 'Any questions about this scene?');
     const questionInput = make('input', 'sv-qa-input');
     questionInput.type = 'text';
-    questionInput.placeholder = 'Ej.: ¿Qué significa esta cifra?';
+    questionInput.placeholder = 'e.g., What does this number mean for us?';
     questionInput.maxLength = 500;
     questionInput.autocomplete = 'off';
     questionLabel.htmlFor = 'sv-question-' + Math.random().toString(36).slice(2, 8);
     questionInput.id = questionLabel.htmlFor;
-    const ask = make('button', 'sv-btn sv-ask', 'Preguntar');
+    const ask = make('button', 'sv-btn sv-ask', 'Ask');
     ask.type = 'submit';
     questions.append(questionLabel, questionInput, ask);
 
@@ -134,7 +135,7 @@
     function speak(scene) {
       stopSpeech();
       paused = false;
-      pause.textContent = '⏸ Pausar';
+      pause.textContent = '⏸ Pause';
       const thisPlayback = playbackId;
       const finished = () => {
         if (destroyed || paused || thisPlayback !== playbackId || waitingAnswer) return;
@@ -143,10 +144,10 @@
       if (scene.audio_b64) {
         audio = new Audio('data:audio/mpeg;base64,' + scene.audio_b64);
         audio.onended = finished;
-        audio.play().catch(() => { /* Controles manuales disponibles */ });
+        audio.play().catch(() => { /* Manual playback controls available */ });
       } else if ('speechSynthesis' in window && scene.narration) {
         utterance = new SpeechSynthesisUtterance(scene.narration);
-        utterance.lang = 'es-ES';
+        utterance.lang = 'en-US';
         utterance.rate = 0.97;
         utterance.onend = finished;
         window.speechSynthesis.speak(utterance);
@@ -158,8 +159,8 @@
       const currentStep = sceneIndex + 1;
       progressFill.style.width = `${(currentStep / story.scenes.length) * 100}%`;
       progressTrack.setAttribute('aria-valuenow', String(currentStep));
-      progressTrack.setAttribute('aria-valuetext', `Escena ${currentStep} de ${story.scenes.length}`);
-      step.textContent = `ESCENA ${currentStep} DE ${story.scenes.length}`;
+      progressTrack.setAttribute('aria-valuetext', `Scene ${currentStep} of ${story.scenes.length}`);
+      step.textContent = `SCENE ${currentStep} OF ${story.scenes.length}`;
       answerBox.hidden = true;
       waitingAnswer = false;
       questionInput.value = '';
@@ -174,7 +175,7 @@
         metricValue.textContent = safeText(scene.metric_badge.value);
       }
       source.textContent = scene.metric_badge && scene.metric_badge.source_ref
-        ? 'Fuente: ' + safeText(scene.metric_badge.source_ref)
+        ? 'Source: ' + safeText(scene.metric_badge.source_ref)
         : '';
       source.hidden = !source.textContent;
       stage.classList.remove('sv-scene-enter');
@@ -191,12 +192,13 @@
       }
       back.disabled = history.length === 0;
       next.disabled = scene.kind === 'choice';
-      next.textContent = scene.kind === 'ending' ? '↻ Volver al inicio' : 'Siguiente →';
+      next.textContent = scene.kind === 'ending' ? '↻ Restart story' : 'Next →';
       pause.disabled = !scene.narration;
       questions.hidden = !askHandler;
       if (story.data_status === 'mock') root.classList.add('sv-is-mock');
       else root.classList.remove('sv-is-mock');
       speak(scene);
+      if (sceneChangeHandler) sceneChangeHandler(scene);
     }
     function goTo(id, remember) {
       if (destroyed || !sceneMap.has(id)) return;
@@ -224,12 +226,12 @@
         paused = true;
         if (audio) audio.pause();
         if ('speechSynthesis' in window) window.speechSynthesis.pause();
-        pause.textContent = '▶ Reanudar';
+        pause.textContent = '▶ Resume';
       } else {
         paused = false;
         if (audio) audio.play().catch(() => {});
         if ('speechSynthesis' in window) window.speechSynthesis.resume();
-        pause.textContent = '⏸ Pausar';
+        pause.textContent = '⏸ Pause';
       }
     });
     questionInput.addEventListener('focus', () => {
@@ -244,10 +246,10 @@
       stopSpeech();
       stopAnswerAudio();
       paused = true;
-      pause.textContent = '▶ Reanudar';
+      pause.textContent = '▶ Resume';
       ask.disabled = true;
       answerBox.hidden = false;
-      answerText.textContent = 'Consultando la explicación…';
+      answerText.textContent = 'Looking up your answer…';
       const askedSceneId = currentId;
       try {
         const result = await askHandler({
@@ -258,24 +260,24 @@
           scene_narration: scene.narration
         });
         if (destroyed || currentId !== askedSceneId) return;
-        answerText.textContent = safeText(result && result.answer ? result.answer : 'No hay respuesta disponible.');
+        answerText.textContent = safeText(result && result.answer ? result.answer : 'No answer available.');
         if (result && result.audio_b64) {
           answerAudio = new Audio('data:audio/mpeg;base64,' + result.audio_b64);
           answerAudio.play().catch(() => {});
         } else if ('speechSynthesis' in window && result && result.answer) {
           const u = new SpeechSynthesisUtterance(result.answer);
-          u.lang = 'es-ES';
+          u.lang = 'en-US';
           window.speechSynthesis.speak(u);
         }
       } catch (error) {
-        if (!destroyed && currentId === askedSceneId) answerText.textContent = 'No se pudo resolver la duda: ' + safeText(error.message);
+        if (!destroyed && currentId === askedSceneId) answerText.textContent = 'Could not resolve your question: ' + safeText(error.message);
       } finally {
         waitingAnswer = false;
         ask.disabled = false;
       }
     });
     continueAfterAsk.addEventListener('click', () => {
-      // La escena pausada se reproduce otra vez, NUNCA se salta automáticamente.
+      // The paused scene replays from the start; it NEVER skips automatically.
       stopAnswerAudio();
       render();
     });

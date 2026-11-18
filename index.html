@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sherpas Wealth — Historias Financieras Interactivas</title>
+  <title>Sherpas Wealth — Interactive Financial Stories</title>
   
-  <!-- CSS del Cuestionario y del Reproductor de Vídeo -->
+  <!-- Questionnaire and Video Player CSS -->
   <link rel="stylesheet" href="/static/questionnaire.css">
   <link rel="stylesheet" href="/static/video.css">
 
@@ -137,8 +137,235 @@
       cursor: pointer;
     }
 
-    .btn-back:hover {
+    .btn-back:hover { background: #f1f5f9; }
+
+    /* Family Action Tracker & Reminders (revealed at ending scene) */
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .tracker-card {
+      background: var(--card-bg);
+      border: 1px solid #cbd5e1;
+      border-radius: 14px;
+      padding: 1.4rem;
+      margin-top: 1.35rem;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.07);
+      animation: fadeSlideUp 0.45s ease forwards;
+    }
+
+    .tracker-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .tracker-title {
+      font-size: 1.12rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .tracker-subtitle {
+      font-size: 0.85rem;
+      color: #64748b;
+    }
+
+    .score-pill {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      color: #065f46;
+      padding: 0.4rem 0.85rem;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    .tracker-bar-bg {
+      width: 100%;
+      height: 10px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 1rem;
+    }
+
+    .tracker-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #2563eb, #10b981);
+      border-radius: 999px;
+      transition: width 0.35s ease;
+    }
+
+    .move-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      margin-bottom: 1.1rem;
+    }
+
+    .move-item {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.85rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      background: #f8fafc;
+      transition: border-color 0.2s, background 0.2s;
+      flex-wrap: wrap;
+    }
+
+    .move-item.completed {
+      background: #f0fdf4;
+      border-color: #86efac;
+    }
+
+    .move-check-area {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      flex: 1;
+      min-width: 240px;
+      cursor: pointer;
+    }
+
+    .move-check-area input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+      accent-color: #10b981;
+      cursor: pointer;
+    }
+
+    .move-body { flex: 1; }
+    .move-title {
+      font-weight: 700;
+      font-size: 0.94rem;
+      color: #0f172a;
+      text-transform: capitalize;
+    }
+
+    .move-item.completed .move-title {
+      text-decoration: line-through;
+      color: #166534;
+    }
+
+    .move-detail {
+      font-size: 0.83rem;
+      color: #475569;
+      margin-top: 0.2rem;
+    }
+
+    .move-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .move-delta {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #2563eb;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    .btn-remind {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      color: #334155;
+      padding: 0.25rem 0.6rem;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn-remind:hover {
       background: #f1f5f9;
+      border-color: #94a3b8;
+      color: #0f172a;
+    }
+
+    .reminder-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      border-radius: 10px;
+      padding: 0.65rem 0.9rem;
+      margin-bottom: 0.9rem;
+      font-size: 0.83rem;
+      color: #475569;
+    }
+
+    .reminder-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .reminder-select {
+      padding: 0.3rem 0.55rem;
+      font-size: 0.8rem;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+    }
+
+    .checkin-box {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      margin-top: 0.5rem;
+    }
+
+    .checkin-input {
+      flex: 1;
+      min-width: 220px;
+      padding: 0.55rem 0.8rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 0.88rem;
+    }
+
+    .checkin-btn {
+      background: #0f172a;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.55rem 1rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .checkin-btn:hover { background: #1e293b; }
+    .checkin-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+
+    .checkin-response {
+      margin-top: 0.85rem;
+      padding: 0.85rem 1rem;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      color: #1e3a8a;
+      font-size: 0.88rem;
+      display: none;
     }
   </style>
 </head>
@@ -150,11 +377,11 @@
         <div class="logo-icon">S</div>
         <div>
           <div class="brand-title">Sherpas Wealth</div>
-          <div class="brand-subtitle">Experiencia Financiera Interactiva</div>
+          <div class="brand-subtitle">Interactive Financial Experience</div>
         </div>
       </div>
       <div>
-        <label for="family-select"><strong>Familia:</strong> </label>
+        <label for="family-select"><strong>Household:</strong> </label>
         <select id="family-select" onchange="initFlow()">
           <option value="timothy-melanie-weah">Timothy & Melanie Weah</option>
           <option value="michael-carter">Michael Carter</option>
@@ -165,19 +392,285 @@
     </header>
 
     <div class="status-bar">
-      <span>Conectado a la API de Sherpas Wealth (Contrato v1)</span>
-      <span class="status-badge" id="data-status-badge">Origen Datos</span>
+      <span>Connected to Sherpas Wealth API (Contract v1)</span>
+      <span class="status-badge" id="data-status-badge">Data Source</span>
     </div>
 
     <div id="questionnaire-container"></div>
     <div id="video-root"></div>
   </div>
 
-  <!-- Scripts de los módulos -->
+  <!-- Module Scripts -->
   <script src="/static/questionnaire.js"></script>
   <script src="/static/video.js"></script>
 
   <script>
+    function downloadCalendarReminder(title, description, daysAhead) {
+      const start = new Date();
+      start.setDate(start.getDate() + Number(daysAhead || 7));
+      start.setHours(10, 0, 0, 0);
+      const end = new Date(start.getTime() + 30 * 60000);
+
+      const fmt = (d) => d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+      const cleanDesc = String(description || "Review your Sherpas financial plan action step.").replace(/\r?\n/g, " ");
+
+      const icsContent = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Sherpas Wealth//Family Action Reminder//EN",
+        "BEGIN:VEVENT",
+        `UID:sherpas-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@sherpaswealth.com`,
+        `DTSTAMP:${fmt(new Date())}`,
+        `DTSTART:${fmt(start)}`,
+        `DTEND:${fmt(end)}`,
+        `SUMMARY:Sherpas Plan Action: ${title}`,
+        `DESCRIPTION:${cleanDesc}`,
+        "BEGIN:VALARM",
+        "TRIGGER:-PT15M",
+        "ACTION:DISPLAY",
+        `DESCRIPTION:Reminder: ${title}`,
+        "END:VALARM",
+        "END:VEVENT",
+        "END:VCALENDAR"
+      ].join("\r\n");
+
+      const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "sherpas-action-reminder.ics";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function renderActionTracker(parentEl, caseId, trackerData) {
+      if (!trackerData || !Array.isArray(trackerData.moves) || trackerData.moves.length === 0) {
+        return;
+      }
+
+      const storageKey = "sherpas_tracker_" + caseId;
+      let completedIds = [];
+      try {
+        completedIds = JSON.parse(localStorage.getItem(storageKey) || "[]");
+      } catch (e) {
+        completedIds = [];
+      }
+
+      const card = document.createElement("section");
+      card.className = "tracker-card";
+
+      const baseScore = Number(trackerData.base_score || 0);
+      const moves = trackerData.moves;
+
+      function computeLiveScore() {
+        let totalGain = 0;
+        moves.forEach((m) => {
+          if (completedIds.includes(m.id)) {
+            const delta = Math.max(0, Number(m.score_after || baseScore) - Number(m.score_before || baseScore));
+            totalGain += delta > 0 ? delta : 2;
+          }
+        });
+        return Math.min(100, baseScore + totalGain);
+      }
+
+      const header = document.createElement("div");
+      header.className = "tracker-header";
+
+      const titleWrap = document.createElement("div");
+      const title = document.createElement("div");
+      title.className = "tracker-title";
+      title.textContent = "🎯 Your Family Action Plan & Progress Tracker";
+      const sub = document.createElement("div");
+      sub.className = "tracker-subtitle";
+      sub.textContent = "Turn your story into action: check off completed steps or schedule a calendar reminder.";
+      titleWrap.append(title, sub);
+
+      const scorePill = document.createElement("div");
+      scorePill.className = "score-pill";
+
+      header.append(titleWrap, scorePill);
+
+      const barBg = document.createElement("div");
+      barBg.className = "tracker-bar-bg";
+      const barFill = document.createElement("div");
+      barFill.className = "tracker-bar-fill";
+      barBg.appendChild(barFill);
+
+      // Cadence selector for reminders
+      const reminderBar = document.createElement("div");
+      reminderBar.className = "reminder-bar";
+      const reminderLabel = document.createElement("span");
+      reminderLabel.textContent = "⏰ Stay on track: add any action or a monthly family review to your calendar.";
+
+      const reminderControls = document.createElement("div");
+      reminderControls.className = "reminder-controls";
+
+      const cadenceSelect = document.createElement("select");
+      cadenceSelect.className = "reminder-select";
+      cadenceSelect.setAttribute("aria-label", "Reminder timing");
+      [
+        { value: "7", label: "In 7 days" },
+        { value: "30", label: "In 30 days (Monthly)" },
+        { value: "90", label: "In 90 days (Quarterly)" }
+      ].forEach((opt) => {
+        const o = document.createElement("option");
+        o.value = opt.value;
+        o.textContent = opt.label;
+        cadenceSelect.appendChild(o);
+      });
+
+      const fullCheckinCalBtn = document.createElement("button");
+      fullCheckinCalBtn.type = "button";
+      fullCheckinCalBtn.className = "btn-remind";
+      fullCheckinCalBtn.textContent = "📅 Schedule Family Check-In";
+      fullCheckinCalBtn.addEventListener("click", () => {
+        const pendingSummary = moves
+          .filter((m) => !completedIds.includes(m.id))
+          .map((m) => "- " + m.title)
+          .join(" | ");
+        downloadCalendarReminder(
+          "Sherpas Family Financial Check-In",
+          pendingSummary
+            ? "Review progress on pending plan actions: " + pendingSummary
+            : "Review your Sherpas financial health milestones together.",
+          cadenceSelect.value
+        );
+      });
+
+      reminderControls.append(cadenceSelect, fullCheckinCalBtn);
+      reminderBar.append(reminderLabel, reminderControls);
+
+      const listEl = document.createElement("div");
+      listEl.className = "move-list";
+
+      function refreshScoreUI() {
+        const live = computeLiveScore();
+        scorePill.textContent = `Health Score: ${baseScore} → ${live}/100 (${completedIds.length}/${moves.length} done)`;
+        barFill.style.width = `${live}%`;
+      }
+
+      moves.forEach((m) => {
+        const item = document.createElement("div");
+        item.className = "move-item" + (completedIds.includes(m.id) ? " completed" : "");
+
+        const checkLabel = document.createElement("label");
+        checkLabel.className = "move-check-area";
+
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = completedIds.includes(m.id);
+
+        cb.addEventListener("change", () => {
+          if (cb.checked) {
+            if (!completedIds.includes(m.id)) completedIds.push(m.id);
+            item.classList.add("completed");
+          } else {
+            completedIds = completedIds.filter((id) => id !== m.id);
+            item.classList.remove("completed");
+          }
+          localStorage.setItem(storageKey, JSON.stringify(completedIds));
+          refreshScoreUI();
+        });
+
+        const body = document.createElement("div");
+        body.className = "move-body";
+        const mTitle = document.createElement("div");
+        mTitle.className = "move-title";
+        mTitle.textContent = m.title;
+        const mDetail = document.createElement("div");
+        mDetail.className = "move-detail";
+        mDetail.textContent = m.detail || "Recommended high-impact step from your Sherpas plan.";
+        body.append(mTitle, mDetail);
+        checkLabel.append(cb, body);
+
+        const actionsWrap = document.createElement("div");
+        actionsWrap.className = "move-actions";
+
+        const deltaVal = Math.max(0, Number(m.score_after || baseScore) - Number(m.score_before || baseScore));
+        const badge = document.createElement("span");
+        badge.className = "move-delta";
+        badge.textContent = deltaVal > 0 ? `+${deltaVal} pts` : "Key habit";
+
+        const remindBtn = document.createElement("button");
+        remindBtn.type = "button";
+        remindBtn.className = "btn-remind";
+        remindBtn.textContent = "📅 Remind me";
+        remindBtn.title = "Download calendar reminder (.ics)";
+        remindBtn.addEventListener("click", () => {
+          downloadCalendarReminder(
+            m.title,
+            m.detail || "Recommended high-impact step from your Sherpas plan.",
+            cadenceSelect.value
+          );
+        });
+
+        actionsWrap.append(badge, remindBtn);
+        item.append(checkLabel, actionsWrap);
+        listEl.appendChild(item);
+      });
+
+      const checkinBox = document.createElement("div");
+      checkinBox.className = "checkin-box";
+
+      const noteInput = document.createElement("input");
+      noteInput.type = "text";
+      noteInput.className = "checkin-input";
+      noteInput.placeholder = "Share an update (e.g., Paid $1,500 off our credit card this month)";
+      noteInput.maxLength = 250;
+
+      const checkinBtn = document.createElement("button");
+      checkinBtn.type = "button";
+      checkinBtn.className = "checkin-btn";
+      checkinBtn.textContent = "🔊 Run AI Coach Check-In";
+
+      const responseBox = document.createElement("div");
+      responseBox.className = "checkin-response";
+
+      checkinBtn.addEventListener("click", async () => {
+        checkinBtn.disabled = true;
+        checkinBtn.textContent = "Reviewing progress...";
+        responseBox.style.display = "block";
+        responseBox.textContent = "Analyzing your completed habits against your Sherpas plan...";
+
+        const completedTitles = moves.filter((m) => completedIds.includes(m.id)).map((m) => m.title);
+        const pendingTitles = moves.filter((m) => !completedIds.includes(m.id)).map((m) => m.title);
+
+        try {
+          const res = await fetch("/api/checkin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              case_id: caseId,
+              completed_moves: completedTitles,
+              pending_moves: pendingTitles,
+              current_score: baseScore,
+              projected_score: computeLiveScore(),
+              user_note: noteInput.value.trim()
+            })
+          });
+          const data = await res.json();
+          responseBox.textContent = "🎙️ Sherpas Coach: " + (data.feedback || "Great progress on your plan!");
+          if (data.audio_b64) {
+            const coachAudio = new Audio("data:audio/mpeg;base64," + data.audio_b64);
+            coachAudio.play().catch(() => {});
+          }
+        } catch (err) {
+          responseBox.textContent = "Could not complete check-in: " + err.message;
+        } finally {
+          checkinBtn.disabled = false;
+          checkinBtn.textContent = "🔊 Run AI Coach Check-In";
+        }
+      });
+
+      checkinBox.append(noteInput, checkinBtn);
+      card.append(header, barBg, reminderBar, listEl, checkinBox, responseBox);
+      parentEl.appendChild(card);
+
+      refreshScoreUI();
+    }
+
     function initFlow() {
       const selectedCaseId = document.getElementById("family-select").value;
       const qContainer = document.getElementById("questionnaire-container");
@@ -188,7 +681,7 @@
       vRoot.innerHTML = "";
 
       if (typeof window.SherpasQuestionnaire === "undefined") {
-        qContainer.innerHTML = `<div class="error-card">⚠️ No se encuentra static/questionnaire.js</div>`;
+        qContainer.innerHTML = `<div class="error-card">⚠️ static/questionnaire.js not found</div>`;
         return;
       }
 
@@ -200,9 +693,9 @@
           vRoot.innerHTML = `
             <div class="loading-state">
               <div class="spinner"></div>
-              <h3>Generando vuestra historia financiera personalizada...</h3>
+              <h3>Generating your personalized financial story...</h3>
               <p style="color: #64748b; font-size: 0.9rem; margin-top: 0.5rem;">
-                Analizando el plan de Sherpas e integrando vuestras prioridades.
+                Analyzing your Sherpas plan and integrating your family priorities.
               </p>
             </div>`;
 
@@ -215,7 +708,7 @@
 
             if (!response.ok) {
               const errData = await response.json();
-              throw new Error(errData.detail || `Error HTTP ${response.status}`);
+              throw new Error(errData.detail || `HTTP Error ${response.status}`);
             }
 
             const storyData = await response.json();
@@ -226,17 +719,16 @@
             vRoot.innerHTML = "";
 
             if (typeof window.SherpasVideo === "undefined") {
-              vRoot.innerHTML = `<div class="error-card">⚠️ No se encuentra static/video.js</div>`;
+              vRoot.innerHTML = `<div class="error-card">⚠️ static/video.js not found</div>`;
               return;
             }
 
-            // Botón para volver a editar el cuestionario conservando los datos
             const backBar = document.createElement("div");
             backBar.className = "back-bar";
             const backBtn = document.createElement("button");
             backBtn.type = "button";
             backBtn.className = "btn-back";
-            backBtn.textContent = "← Editar respuestas del cuestionario";
+            backBtn.textContent = "← Edit questionnaire answers";
             backBtn.onclick = function () {
               vRoot.innerHTML = "";
               qContainer.style.display = "block";
@@ -246,6 +738,12 @@
 
             const playerContainer = document.createElement("div");
             vRoot.appendChild(playerContainer);
+
+            const trackerContainer = document.createElement("div");
+            trackerContainer.hidden = true;
+            vRoot.appendChild(trackerContainer);
+
+            renderActionTracker(trackerContainer, selectedCaseId, storyData.tracker);
 
             window.SherpasVideo.mount({
               container: playerContainer,
@@ -257,13 +755,19 @@
                   body: JSON.stringify(videoQuestionRequestJson)
                 });
                 return await askRes.json();
+              },
+              onSceneChange: function (scene) {
+                if (scene && scene.kind === "ending" && trackerContainer.hidden) {
+                  trackerContainer.hidden = false;
+                  trackerContainer.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                }
               }
             });
 
           } catch (err) {
             vRoot.innerHTML = `
               <div class="error-card">
-                <h3>⚠️ Error al generar la historia</h3>
+                <h3>⚠️ Error generating story</h3>
                 <p>${err.message}</p>
               </div>`;
           }
