@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+openai
+python-dotenv
+mcp
+pydantic
+websockets
+httpx
+requests
