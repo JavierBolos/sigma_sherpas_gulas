@@ -44,3 +44,16 @@
 @media(max-width:530px) { .sv-root { padding:0; } .sv-device { border-radius:15px; min-height:unset; } .sv-header { padding:20px 17px 13px; } .sv-stage { min-height:330px; } .sv-controls { flex-wrap:wrap; } }
 .sv-root [hidden] { display: none !important; }
 @media(prefers-reduced-motion:reduce) { .sv-progress-fill { transition:none; } .sv-scene-enter { animation:none; } }
+
+/* Vídeos de Flow: mantienen el formato horizontal sin modificar la UI existente. */
+.sv-scene-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 280px;
+  object-fit: cover;
+  background: #0f172a;
+  border-radius: 12px;
+  margin: 8px auto 14px;
+}
+.sv-scene-video[hidden] { display: none !important; }

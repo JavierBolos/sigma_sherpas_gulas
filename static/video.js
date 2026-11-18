@@ -1,3 +1,4 @@
+
 /* SHERPAS · Interactive Audiovisual Player · Annual Escalation & Video Edition
 - Public API: window.SherpasVideo.mount({ container, story, onAsk, onSceneChange })
 - Visualizes year-by-year financial escalation, scene videos, and unlocks the tracker on ending.
@@ -13,6 +14,114 @@
     return el;
   };
   const THEMES = new Set(['family_travel', 'dream_home', 'early_retirement', 'financial_shield']);
+
+  // Biblioteca: clips disponibles ahora y clips financieros que podréis añadir después.
+  // Los nombres deben coincidir EXACTAMENTE con los archivos de static/videos/.
+  const VIDEO_DIR = '/static/videos/';
+  const EMOTIONAL = {
+    family: 'familia_feliz.mp4',
+    personal: 'persona_planificando.mp4',
+    familyDecisions: 'mesa_decisiones.mp4',
+    vacation: 'vacaciones.mp4',
+    home: 'nuevo_hogar.mp4',
+    car: 'movilidad_vehiculo.mp4',
+    university: 'universidad.mp4',
+    time: 'paso_del_tiempo.mp4',
+    retirement: 'vida_jubilacion.mp4',
+    emergency: 'gastos_imprevistos.mp4'
+  };
+
+  // Primer archivo: específico. Los siguientes son alternativas si aún no lo habéis generado.
+  // Así la app funciona con vuestros 10 MP4 actuales y mejora al añadir los demás.
+  const VIDEO_RULES = [
+    { match: /universidad|universitar|educacion|estudi|college|tuition|scholar|529|matricula|hijos.*futuro|children.*education/, clips: ['ahorro_educacion.mp4', EMOTIONAL.university] },
+    { match: /viaje|vacacion|travel|holiday|trip|tourism|leisure/, clips: [EMOTIONAL.vacation] },
+    { match: /coche|vehicul|automovil|car purchase|car loan|vehicle|auto loan|mobility/, clips: [EMOTIONAL.car] },
+    { match: /vivienda|casa|hogar|hipoteca|mortgage|housing|home purchas|buy a home|new home|property purchas/, clips: [EMOTIONAL.home] },
+    { match: /seguro|proteccion|cobertura|insurance|umbrella|liability|life cover|protection/, clips: ['cobertura_seguros.mp4', EMOTIONAL.emergency] },
+    { match: /emergencia|imprevist|emergency fund|cash reserve|rainy.day|safety cushion|liquidity buffer|reserve target/, clips: ['reserva_emergencia.mp4', EMOTIONAL.emergency] },
+    { match: /tarjeta|intereses|credit card|interest rate|high.interest|apr|costly debt/, clips: ['coste_intereses.mp4', EMOTIONAL.familyDecisions] },
+    { match: /amortiza|deuda|prestamo|debt|loan|liabilit|repayment|debt.free/, clips: ['amortizacion_deuda.mp4', EMOTIONAL.familyDecisions] },
+    { match: /ingresos.*gastos|flujo de caja|cash flow|income.*expenses|sankey|monthly budget|presupuesto|income.*spend/, clips: ['flujo_dinero.mp4', EMOTIONAL.familyDecisions] },
+    { match: /ahorro periodico|contribucion|aportacion|401\s?\(?k\)?|retirement accounts|employer match|hsa|ira|savings contribution/, clips: ['aportaciones_ahorro.mp4', EMOTIONAL.familyDecisions] },
+    { match: /asignacion|cartera|asset allocation|portfolio mix|allocation|rebalanc|stock.*bond/, clips: ['distribucion_cartera.mp4', EMOTIONAL.familyDecisions] },
+    { match: /volatilidad|rentabilidad|benchmark|risk.*return|volatility|market performance|market shock|drawdown|riesgo/, clips: ['riesgo_rendimiento.mp4', EMOTIONAL.familyDecisions] },
+    { match: /patrimonio neto|net worth|activos|pasivos|assets|liabilities|balance sheet/, clips: ['activos_pasivos.mp4', EMOTIONAL.familyDecisions] },
+    { match: /retiro|jubilacion|retirement|pension|social security|retire|pensionist/, clips: ['ingresos_jubilacion.mp4', EMOTIONAL.retirement] },
+    { match: /financiar|funding|objetivos|goals|prioridades|priorit|decision|trade.off|recommendation|recomendacion/, clips: ['decisiones_presupuesto.mp4', EMOTIONAL.familyDecisions] }
+  ];
+
+  function normalizar(text) {
+    return String(text ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+
+  function videoCandidates(scene, story) {
+    const list = [];
+    const push = (...clips) => {
+      for (const clip of clips) {
+        if (!clip) continue;
+        const url = clip.startsWith('/') ? clip : VIDEO_DIR + clip;
+        // No se aceptan rutas arbitrarias del texto generado por la IA.
+        if (/^\/static\/videos\/[a-z0-9_-]+\.mp4$/i.test(url) && !list.includes(url)) list.push(url);
+      }
+    };
+
+    // Si el backend asigna un MP4 local a una escena, tiene preferencia.
+    if (scene.video_url) push(scene.video_url);
+    if (scene.video_key) push(scene.video_key.endsWith('.mp4') ? scene.video_key : scene.video_key + '.mp4');
+
+    // La introducción puede variar según el perfil real.
+    const isIntro = scene.id === story.start_scene_id || /^(starting_point|intro|introduction)$/.test(scene.id);
+    if (isIntro) {
+      if (story.case_id === 'timothy-melanie-weah' || story.case_id === 'daniel-emily-johnson') {
+        push(EMOTIONAL.family);
+      } else if (story.case_id === 'samantha-lewis') {
+        push('adulto_con_hijos.mp4', EMOTIONAL.personal);
+      } else {
+        push(EMOTIONAL.personal);
+      }
+      push(EMOTIONAL.familyDecisions);
+      return list;
+    }
+
+    if (scene.kind === 'choice') {
+      push('decisiones_presupuesto.mp4', EMOTIONAL.familyDecisions);
+      return list;
+    }
+    if (scene.kind === 'ending') {
+      push('futuro_abierto.mp4', EMOTIONAL.time, EMOTIONAL.familyDecisions);
+      return list;
+    }
+    if (scene.id === 'plan_projection') {
+      push('proyeccion_patrimonio.mp4', EMOTIONAL.time);
+    }
+
+    // Título e indicador tienen más peso que una mención secundaria.
+    const main = normalizar([scene.headline, scene.metric_badge?.label, scene.period_label].join(' '));
+    const secondary = normalizar(scene.narration);
+    const ranked = VIDEO_RULES.map((r, index) => ({
+      ...r,
+      index,
+      score: Math.min(
+        (r.match.test(main) ? 5 : 0) + (r.match.test(secondary) ? 1 : 0),
+        index === VIDEO_RULES.length - 1 ? 3 : 6
+      )
+    })).filter(r => r.score > 0).sort((a,b) => b.score - a.score || a.index - b.index);
+
+    for (const r of ranked.slice(0, 2)) push(...r.clips);
+
+    if (scene.id === 'plan_projection' || /proyeccion|projection|forecast|timeline|horizon|future/.test(main)) {
+      push('proyeccion_patrimonio.mp4', EMOTIONAL.time);
+    }
+
+    if (scene.visual_theme === 'dream_home') push(EMOTIONAL.home);
+    if (scene.visual_theme === 'early_retirement') push('proyeccion_patrimonio.mp4', EMOTIONAL.retirement);
+    if (scene.visual_theme === 'financial_shield') push('cobertura_seguros.mp4', EMOTIONAL.emergency);
+    if (scene.visual_theme === 'family_travel') push(EMOTIONAL.vacation);
+
+    push(EMOTIONAL.familyDecisions);
+    return list;
+  }
 
   function validateStory(story) {
     if (!story || !Array.isArray(story.scenes) || story.scenes.length < 3) {
@@ -72,7 +181,8 @@
 
     // Visual Year-by-Year Escalation Strip
     const ladderStrip = make('div', 'sv-ladder');
-    ladderStrip.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:12px;';
+    
+    ladderStrip.style.cssText = 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:100%;margin-top:14px;align-items:stretch;';
     const ladderCards = ladder.map((item) => {
       const card = make('div', 'sv-ladder-step');
       card.style.cssText = 'padding:8px 10px;border-radius:10px;border:1px solid #cbd5e1;background:#f8fafc;text-align:left;transition:all 0.25s ease;';
@@ -98,12 +208,41 @@
     bgVideo.loop = true;
     bgVideo.playsInline = true;
     bgVideo.autoplay = true;
-    bgVideo.style.cssText = 'width:100%;aspect-ratio:16/9;max-height:280px;object-fit:cover;border-radius:12px;margin:8px auto 14px;display:none;background:#0f172a;';
+    bgVideo.preload = 'auto';
+    bgVideo.hidden = true;
+    bgVideo.setAttribute('aria-hidden', 'true');
+    bgVideo.disablePictureInPicture = true;
+    bgVideo.controls = false;
+    let candidates = [];
+    let candidateIndex = 0;
 
-    // Fallback automatically to emoji symbol if the video file is missing or fails to load
+    function showCandidate() {
+      if (destroyed) return;
+      if (candidateIndex >= candidates.length) {
+        bgVideo.pause();
+        bgVideo.hidden = true;
+        bgVideo.removeAttribute('src');
+        symbol.hidden = false;
+        return;
+      }
+      bgVideo.hidden = true;
+      symbol.hidden = false;
+      bgVideo.src = candidates[candidateIndex];
+      bgVideo.load();
+    }
+
+    bgVideo.addEventListener('loadeddata', () => {
+      if (destroyed || candidateIndex >= candidates.length) return;
+      bgVideo.hidden = false;
+      symbol.hidden = true;
+      if (!paused && !waitingAnswer) bgVideo.play().catch(() => {});
+    });
+
+    // Si un vídeo no existe, intentar el siguiente.
     bgVideo.addEventListener('error', () => {
-      bgVideo.style.display = 'none';
-      symbol.style.display = 'block';
+      if (destroyed) return;
+      candidateIndex += 1;
+      showCandidate();
     });
 
     const headline = make('h3', 'sv-scene-title');
@@ -184,12 +323,14 @@
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
       utterance = null;
     }
+
     function stopAnswerAudio() {
       if (answerAudio) {
         answerAudio.pause();
         answerAudio = null;
       }
     }
+
     function speak(scene) {
       stopSpeech();
       paused = false;
@@ -211,6 +352,7 @@
         window.speechSynthesis.speak(utterance);
       }
     }
+
     function render() {
       const scene = sceneMap.get(currentId);
       const sceneIndex = story.scenes.findIndex((item) => item.id === currentId);
@@ -227,20 +369,11 @@
       year.textContent = scene.year === null ? safeText(scene.period_label) : String(scene.year);
       symbol.textContent = visuals[scene.visual_theme];
 
-      // Load scene video if provided, or test default clip in /static/videos/financial_shield.mp4
-      const videoUrl = scene.video_url || '/static/videos/familia_feliz.mp4';
-      if (videoUrl) {
-        if (!bgVideo.src.endsWith(videoUrl)) {
-          bgVideo.src = videoUrl;
-        }
-        bgVideo.style.display = 'block';
-        symbol.style.display = 'none';
-        bgVideo.play().catch(() => {});
-      } else {
-        bgVideo.pause();
-        bgVideo.style.display = 'none';
-        symbol.style.display = 'block';
-      }
+      // Selección automática de clip según el contenido de la escena.
+      bgVideo.pause();
+      candidates = videoCandidates(scene, story);
+      candidateIndex = 0;
+      showCandidate();
 
       headline.textContent = safeText(scene.headline);
       stage.dataset.theme = scene.visual_theme;
@@ -258,6 +391,7 @@
       void stage.offsetWidth;
       stage.classList.add('sv-scene-enter');
       choices.replaceChildren();
+
       if (scene.kind === 'choice') {
         for (const choice of (scene.choices || [])) {
           const button = make('button', 'sv-choice', choice.label);
@@ -266,16 +400,20 @@
           choices.append(button);
         }
       }
+
       back.disabled = history.length === 0;
       next.disabled = scene.kind === 'choice';
       next.textContent = scene.kind === 'ending' ? '↻ Restart story' : 'Next →';
       pause.disabled = !scene.narration;
       questions.hidden = !askHandler;
+
       if (story.data_status === 'mock') root.classList.add('sv-is-mock');
       else root.classList.remove('sv-is-mock');
+
       speak(scene);
       if (sceneChangeHandler) sceneChangeHandler(scene);
     }
+
     function goTo(id, remember) {
       if (destroyed || !sceneMap.has(id)) return;
       stopAnswerAudio();
@@ -283,12 +421,14 @@
       currentId = id;
       render();
     }
+
     back.addEventListener('click', () => {
       if (!history.length) return;
       currentId = history.pop();
       stopAnswerAudio();
       render();
     });
+
     next.addEventListener('click', () => {
       const scene = sceneMap.get(currentId);
       if (scene.kind === 'ending') {
@@ -297,6 +437,7 @@
         render();
       } else if (scene.next_scene_id) goTo(scene.next_scene_id, true);
     });
+
     pause.addEventListener('click', () => {
       if (!paused) {
         paused = true;
@@ -307,14 +448,16 @@
       } else {
         paused = false;
         if (audio) audio.play().catch(() => {});
-        if (bgVideo.style.display !== 'none') bgVideo.play().catch(() => {});
+        if (!bgVideo.hidden) bgVideo.play().catch(() => {});
         if ('speechSynthesis' in window) window.speechSynthesis.resume();
         pause.textContent = '⏸ Pause';
       }
     });
+
     questionInput.addEventListener('focus', () => {
       if (!paused) pause.click();
     });
+
     questions.addEventListener('submit', async (event) => {
       event.preventDefault();
       const text = questionInput.value.trim();
@@ -323,12 +466,14 @@
       waitingAnswer = true;
       stopSpeech();
       stopAnswerAudio();
+      bgVideo.pause();
       paused = true;
       pause.textContent = '▶ Resume';
       ask.disabled = true;
       answerBox.hidden = false;
       answerText.textContent = 'Looking up your answer…';
       const askedSceneId = currentId;
+
       try {
         const result = await askHandler({
           case_id: story.case_id,
@@ -348,29 +493,42 @@
           window.speechSynthesis.speak(u);
         }
       } catch (error) {
-        if (!destroyed && currentId === askedSceneId) answerText.textContent = 'Could not resolve your question: ' + safeText(error.message);
+        if (!destroyed && currentId === askedSceneId) {
+          answerText.textContent = 'Could not resolve your question: ' + safeText(error.message);
+        }
       } finally {
         waitingAnswer = false;
         ask.disabled = false;
       }
     });
+
     continueAfterAsk.addEventListener('click', () => {
       stopAnswerAudio();
       render();
     });
 
     render();
+
     return {
       destroy() {
         destroyed = true;
         stopSpeech();
         stopAnswerAudio();
         bgVideo.pause();
+        bgVideo.removeAttribute('src');
         container.replaceChildren();
       },
-      goToScene(sceneId) { goTo(sceneId, true); },
+      goToScene(sceneId) { goTo(sceneid, true); },
       getCurrentSceneId() { return currentId; }
     };
   }
-  window.SherpasVideo = { mount };
+
+  window.SherpasVideo = {
+    mount,
+    elegirVideo: (scene, story = {}) =>
+      videoCandidates(
+        scene,
+        { start_scene_id: story.start_scene_id || 'starting_point', ...story }
+      )[0] || null
+  };
 })();
